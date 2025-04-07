@@ -27,7 +27,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           seconds: 86400
-          branch: 'main'
+          branch: 'For-school-only'
 
   builder_matrix:
     strategy:
