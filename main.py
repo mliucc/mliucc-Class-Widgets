@@ -393,7 +393,7 @@ def get_next_lessons():
                     if c_time > current_dt and item_name.startswith('a'):
                         next_lessons.append(current_lessons[item_name])
                     c_time += dt.timedelta(minutes=add_time)
-
+    return next_lessons
 
 def get_next_lessons_text():
     if not next_lessons:
@@ -636,7 +636,7 @@ class PluginManager:  # 插件管理器
             "Current_Lesson": current_lesson_name,  # 当前课程名
             "State": current_state,  # 0：课间 1：上课（上下课状态）
             "Current_Part": get_part(),  # 返回开始时间、Part序号
-            "Next_Lessons_text": get_next_lessons_text(),  # 下节课程
+            "Next_Lessons": get_next_lessons(),  # 下节课程
 
             "Weather": weather_name,  # 天气情况
             "Temp": temperature,  # 温度
@@ -1233,7 +1233,7 @@ class FloatingWidget(QWidget):  # 浮窗
 
     def update_data(self):
         time_color = QColor(f'#{config_center.read_conf("Color", "floating_time")}')
-        self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
+        self.activity_countdown.setStyleSheet(f"color: {time_color.name()}; background: transparent")
         if self.animating:  # 执行动画时跳过更新
             return
         self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
