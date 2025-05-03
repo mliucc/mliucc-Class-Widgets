@@ -493,7 +493,6 @@ def get_next_lessons():
                         next_lessons.append(current_lessons[item_name])
                     c_time += dt.timedelta(minutes=add_time)
 
-
 def get_next_lessons_text():
     if not next_lessons:
         cache_text = '当前暂无课程'
@@ -1422,7 +1421,7 @@ class FloatingWidget(QWidget):  # 浮窗
 
     def update_data(self):
         time_color = QColor(f'#{config_center.read_conf("Color", "floating_time")}')
-        self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
+        self.activity_countdown.setStyleSheet(f"color: {time_color.name()}; background: transparent")
         if self.animating:  # 执行动画时跳过更新
             return
         if platform.system() == 'Windows' and platform.release() != '7':
