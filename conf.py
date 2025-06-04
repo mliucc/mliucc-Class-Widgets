@@ -32,9 +32,16 @@ countdown_cnt = 0
 
 def load_theme_config(theme):
     try:
-        with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
-            data = json.load(file)
-            return data
+        if os.path.exists(f'{base_directory}/ui/{theme}'):
+            with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                logger.debug(data)
+                return data
+        else:
+            with open(base_directory / 'theme' / theme / 'theme.json', 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                logger.debug(data)
+                return data
     except FileNotFoundError:
         logger.warning(f"主题配置文件 {theme} 不存在，返回默认配置")
         return str(base_directory / 'ui' / 'default' / 'theme.json')

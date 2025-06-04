@@ -1820,22 +1820,26 @@ class DesktopWidget(QWidget):  # 主要小组件
             logger.error(f"更新插件小组件时出错：{e}")
 
     def init_ui(self, path):
-        if conf.load_theme_config(theme)['support_dark_mode']:
-            if os.path.exists(f'{base_directory}/ui/{theme}/{path}'):
-                if isDarkTheme():
-                    uic.loadUi(f'{base_directory}/ui/{theme}/dark/{path}', self)
-                else:
-                    uic.loadUi(f'{base_directory}/ui/{theme}/{path}', self)
-            else:
-                if isDarkTheme():
-                    uic.loadUi(f'{base_directory}/ui/{theme}/dark/widget-base.ui', self)
-                else:
-                    uic.loadUi(f'{base_directory}/ui/{theme}/widget-base.ui', self)
+        if os.path.exists(f'{base_directory}/ui/{theme}'):
+            theme_path = f'{base_directory}/ui/{theme}'
         else:
-            if os.path.exists(f'{base_directory}/ui/{theme}/{path}'):
-                uic.loadUi(f'{base_directory}/ui/{theme}/{path}', self)
+           theme_path = f'{base_directory}/theme/{theme}' 
+        if conf.load_theme_config(theme)['support_dark_mode']:
+            if os.path.exists(f'{theme_path}/{path}'):
+                if isDarkTheme():
+                    uic.loadUi(f'{theme_path}/dark/{path}', self)
+                else:
+                    uic.loadUi(f'{theme_path}/{path}', self)
             else:
-                uic.loadUi(f'{base_directory}/ui/{theme}/widget-base.ui', self)
+                if isDarkTheme():
+                    uic.loadUi(f'{theme_path}/dark/widget-base.ui', self)
+                else:
+                    uic.loadUi(f'{theme_path}/widget-base.ui', self)
+        else:
+            if os.path.exists(f'{theme_path}/{path}'):
+                uic.loadUi(f'{theme_path}/{path}', self)
+            else:
+                uic.loadUi(f'{theme_path}/widget-base.ui', self)
 
         # 设置窗口无边框和透明背景
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -2700,7 +2704,7 @@ def init():
     update_timer.remove_all_callbacks()
 
     theme = config_center.read_conf('General', 'theme')  # 主题
-    if not os.path.exists(f'{base_directory}/ui/{theme}/theme.json'):
+    if not os.path.exists(f'{base_directory}/ui/{theme}/theme.json') and not os.path.exists(f'{base_directory}/theme/{theme}/theme.json'):
         logger.warning(f'主题 {theme} 不存在，使用默认主题')
         theme = 'default'
     logger.info(f'应用主题：{theme}')
