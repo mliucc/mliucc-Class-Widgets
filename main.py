@@ -870,7 +870,7 @@ class WidgetsManager:
     def init_widgets(self):  # 初始化小组件
         self.widgets_list = list_.get_widget_config()
         self.check_widgets_exist()
-        self.spacing = conf.load_theme_config(theme)['spacing']
+        self.spacing = conf.load_theme_config(theme, theme_path)['spacing']
 
         self.get_start_pos()
         cnt_all = {}
@@ -899,14 +899,14 @@ class WidgetsManager:
     @staticmethod
     def get_widget_width(path):
         try:
-            width = conf.load_theme_width(theme)[path]
+            width = conf.load_theme_width(theme_path)[path]
         except KeyError:
             width = list_.widget_width[path]
         return int(width)
 
     @staticmethod
     def get_widgets_height():
-        return int(conf.load_theme_config(theme)['height'])
+        return int(conf.load_theme_config(theme, theme_path)['height'])
 
     def create_widgets(self):
         for widget in self.widgets:
@@ -930,7 +930,7 @@ class WidgetsManager:
         pos_x = self.start_pos_x + self.spacing * num
         for i in range(num):
             try:
-                pos_x += conf.load_theme_width(theme)[self.widgets_list[i]]
+                pos_x += conf.load_theme_width(theme_path)[self.widgets_list[i]]
             except KeyError:
                 pos_x += list_.widget_width[self.widgets_list[i]]
             except:
@@ -1329,13 +1329,13 @@ class FloatingWidget(QWidget):  # 浮窗
 
     def init_ui(self):
         setTheme_()
-        if os.path.exists(f'{base_directory}/ui/{theme}/widget-floating.ui'):
-            if isDarkTheme() and conf.load_theme_config(theme)['support_dark_mode']:
-                uic.loadUi(f'{base_directory}/ui/{theme}/dark/widget-floating.ui', self)
+        if os.path.exists(f'{theme_path}/widget-floating.ui'):
+            if isDarkTheme() and conf.load_theme_config(theme, theme_path)['support_dark_mode']:
+                uic.loadUi(f'{theme_path}/dark/widget-floating.ui', self)
             else:
-                uic.loadUi(f'{base_directory}/ui/{theme}/widget-floating.ui', self)
+                uic.loadUi(f'{theme_path}/widget-floating.ui', self)
         else:
-            if isDarkTheme() and conf.load_theme_config(theme)['support_dark_mode']:
+            if isDarkTheme() and conf.load_theme_config(theme, theme_path)['support_dark_mode']:
                 uic.loadUi(f'{base_directory}/ui/default/dark/widget-floating.ui', self)
             else:
                 uic.loadUi(f'{base_directory}/ui/default/widget-floating.ui', self)
@@ -1667,7 +1667,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.path = path
 
         self.last_code = 101010100
-        self.radius = conf.load_theme_config(theme)['radius']
+        self.radius = conf.load_theme_config(theme, theme_path)['radius']
         self.last_theme = config_center.read_conf('General', 'theme')
         self.last_color_mode = config_center.read_conf('General', 'color_mode')
         self.w = 100
@@ -1685,10 +1685,10 @@ class DesktopWidget(QWidget):  # 主要小组件
         self._is_topmost_callback_added = False # 添加一个标志来跟踪回调是否已添加
 
         try:
-            self.w = conf.load_theme_config(theme)['widget_width'][self.path]
+            self.w = conf.load_theme_config(theme, theme_path)['widget_width'][self.path]
         except KeyError:
             self.w = list_.widget_width[self.path]
-        self.h = conf.load_theme_config(theme)['height']
+        self.h = conf.load_theme_config(theme, theme_path)['height']
 
         init_config()
         self.init_ui(path)
@@ -1820,11 +1820,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             logger.error(f"更新插件小组件时出错：{e}")
 
     def init_ui(self, path):
-        if os.path.exists(f'{base_directory}/ui/{theme}'):
-            theme_path = f'{base_directory}/ui/{theme}'
-        else:
-           theme_path = f'{base_directory}/theme/{theme}' 
-        if conf.load_theme_config(theme)['support_dark_mode']:
+        if conf.load_theme_config(theme, theme_path)['support_dark_mode']:
             if os.path.exists(f'{theme_path}/{path}'):
                 if isDarkTheme():
                     uic.loadUi(f'{theme_path}/dark/{path}', self)
@@ -1952,7 +1948,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         # 添加阴影效果
-        if conf.load_theme_config(theme)['shadow']:  # 修改阴影问题
+        if conf.load_theme_config(theme, theme_path)['shadow']:  # 修改阴影问题
             shadow_effect = QGraphicsDropShadowEffect(self)
             shadow_effect.setBlurRadius(28)
             shadow_effect.setXOffset(0)
@@ -1998,7 +1994,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.tray_menu.addActions([
             Action(fIcon.SHOPPING_CART, '插件广场', triggered=open_plaza),
             Action(fIcon.DEVELOPER_TOOLS, '额外选项', triggered=self.open_extra_menu),
-            Action(fIcon.SETTING, '设置', triggered=open_settings)
+            Action(fIcon.SETTING, '设置', triggered=self.open_settings1)  #需要在open_settings函数内传参‘theme_path’
         ])
         self.tray_menu.addSeparator()
         self.tray_menu.addAction(Action(fIcon.SYNC, '重新启动', triggered=restart))
@@ -2092,8 +2088,8 @@ class DesktopWidget(QWidget):  # 主要小组件
 
             painter = QPainter(pixmap)
             render.render(painter)
-            if (isDarkTheme() and conf.load_theme_config(theme)['support_dark_mode']
-                    or isDarkTheme() and conf.load_theme_config(theme)['default_theme'] == 'dark'):  # 在暗色模式显示亮色图标
+            if (isDarkTheme() and conf.load_theme_config(theme, theme_path)['support_dark_mode']
+                    or isDarkTheme() and conf.load_theme_config(theme, theme_path)['default_theme'] == 'dark'):  # 在暗色模式显示亮色图标
                 painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
                 painter.fillRect(pixmap.rect(), QColor("#FFFFFF"))
             painter.end()
@@ -2390,7 +2386,7 @@ class DesktopWidget(QWidget):  # 主要小组件
     def open_extra_menu(self):
         global ex_menu
         if ex_menu is None or not ex_menu.isVisible():
-            ex_menu = ExtraMenu()
+            ex_menu = ExtraMenu(theme_path)
             ex_menu.show()
             ex_menu.destroyed.connect(self.cleanup_extra_menu)
             logger.info('打开“额外选项”')
@@ -2700,14 +2696,19 @@ def init_config():  # 重设配置文件
 
 
 def init():
-    global theme, radius, mgr, screen_width, first_start, fw, was_floating_mode
+    global theme, radius, mgr, screen_width, first_start, fw, was_floating_mode, theme_path
     update_timer.remove_all_callbacks()
 
     theme = config_center.read_conf('General', 'theme')  # 主题
-    if not os.path.exists(f'{base_directory}/ui/{theme}/theme.json') and not os.path.exists(f'{base_directory}/theme/{theme}/theme.json'):
+    if os.path.exists(f'{base_directory}/ui/{theme}'):
+        theme_path = f'{base_directory}/ui/{theme}'
+    else:
+        theme_path = f'{base_directory}/theme/{theme}' 
+    if not os.path.exists(f'{theme_path}/theme.json'):
         logger.warning(f'主题 {theme} 不存在，使用默认主题')
+        theme_path = f'{base_directory}/ui/default'
         theme = 'default'
-    logger.info(f'应用主题：{theme}')
+    logger.info(f'应用主题：{theme}，所在路径为{theme_path}')
 
     mgr = WidgetsManager()
     fw = FloatingWidget()

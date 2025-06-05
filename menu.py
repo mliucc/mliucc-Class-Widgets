@@ -600,7 +600,7 @@ class TTSPreviewThread(QThread):
 class SettingsMenu(FluentWindow):
     closed = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, theme_path):
         super().__init__()
         self.tts_voice_loader_thread = None
         self.button_clear_log = None
@@ -635,22 +635,22 @@ class SettingsMenu(FluentWindow):
         self.build_commit_label = self.ifInterface.findChild(QLabel, 'build_commit_label')
         self.build_uuid_label = self.ifInterface.findChild(QLabel, 'build_uuid_label')
         self.build_date_label = self.ifInterface.findChild(QLabel, 'build_date_label')
-
+        logger.debug(theme_path)
         self.init_nav()
-        self.init_window()
+        self.init_window(theme_path)
 
     def init_font(self):  # 设置字体
         self.setStyleSheet("""QLabel {
                     font-family: 'Microsoft YaHei';
                 }""")
 
-    def load_all_item(self):
+    def load_all_item(self,theme_path):
         self.setup_timeline_edit()
         self.setup_schedule_edit()
         self.setup_schedule_preview()
         self.setup_advance_interface()
         self.setup_about_interface()
-        self.setup_customization_interface()
+        self.setup_customization_interface(theme_path)
         self.setup_configs_interface()
         self.setup_sound_interface()
         self.setup_help_interface()
@@ -1201,7 +1201,7 @@ class SettingsMenu(FluentWindow):
         cf_what_is_cses = self.findChild(HyperlinkButton, 'what_is')
         cf_what_is_cses.setUrl(QUrl('https://github.com/CSES-org/CSES'))
 
-    def setup_customization_interface(self):
+    def setup_customization_interface(self, theme_path):
         ct_scroll = self.findChild(SmoothScrollArea, 'ct_scroll')  # 触摸屏适配
         QScroller.grabGesture(ct_scroll.viewport(), QScroller.LeftMouseButtonGesture)
 
@@ -1230,7 +1230,7 @@ class SettingsMenu(FluentWindow):
         set_floating_time_color.clicked.connect(self.ct_set_floating_time_color)
 
         open_theme_folder = self.findChild(HyperlinkLabel, 'open_theme_folder')  # 打开主题文件夹
-        open_theme_folder.clicked.connect(lambda: open_dir(os.path.join(base_directory, 'ui')))
+        open_theme_folder.clicked.connect(lambda: open_dir(theme_path))
 
         select_theme_combo = self.findChild(ComboBox, 'combo_theme_select')  # 主题选择
         select_theme_combo.addItems(list_.theme_names)
@@ -1909,6 +1909,7 @@ class SettingsMenu(FluentWindow):
             theme_folder = config_center.read_conf("General", "theme")
             if not os.path.exists(f'{base_directory}/ui/{theme_folder}/theme.json'):
                 theme_folder = 'default'  # 主题文件夹不存在，使用默认主题
+                theme_path = str(base_directory / 'ui' / 'default' / 'theme.json')
                 logger.warning(f'主题文件夹不存在，使用默认主题：{theme_folder}')
 
             for i in range(len(widget_config)):
@@ -2629,9 +2630,9 @@ class SettingsMenu(FluentWindow):
         self.addSubInterface(self.adInterface, fIcon.SETTING, '高级选项', NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.ifInterface, fIcon.INFO, '关于本产品', NavigationItemPosition.BOTTOM)
 
-    def init_window(self):
+    def init_window(self, theme_path):
         self.stackedWidget.setCurrentIndex(0)  # 设置初始页面
-        self.load_all_item()
+        self.load_all_item(theme_path)
         self.setMinimumWidth(700)
         self.setMinimumHeight(400)
         self.navigationInterface.setExpandWidth(250)

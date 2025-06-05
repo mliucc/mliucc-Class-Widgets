@@ -30,18 +30,11 @@ app_icon = base_directory / 'img' / (
 update_countdown_custom_last = 0
 countdown_cnt = 0
 
-def load_theme_config(theme):
+def load_theme_config(theme, theme_path):
     try:
-        if os.path.exists(f'{base_directory}/ui/{theme}'):
-            with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
-                data = json.load(file)
-                logger.debug(data)
-                return data
-        else:
-            with open(base_directory / 'theme' / theme / 'theme.json', 'r', encoding='utf-8') as file:
-                data = json.load(file)
-                logger.debug(data)
-                return data
+        with open(theme_path + '/theme.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            return data
     except FileNotFoundError:
         logger.warning(f"主题配置文件 {theme} 不存在，返回默认配置")
         return str(base_directory / 'ui' / 'default' / 'theme.json')
@@ -89,9 +82,9 @@ def save_installed_plugin(data):
         return False
 
 
-def load_theme_width(theme):
+def load_theme_width(theme_path):
     try:
-        with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
+        with open(theme_path + '/theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
             return data['widget_width']
     except Exception as e:
@@ -321,6 +314,7 @@ if __name__ == '__main__':
     print('AL_1S')
     print(get_week_type())
     print(load_plugins())
+    print(load_theme_config('Elysia', 'd:/cw/mliucc-Class-Widgets/theme/Elysia'))
     # save_data_to_json(test_data_dict, 'schedule-1.json')
     # loaded_data = load_from_json('schedule-1.json')
     # print(loaded_data)

@@ -35,7 +35,7 @@ current_week = dt.datetime.today().weekday()
 temp_schedule = {'schedule': {}, 'schedule_even': {}}
 
 
-def open_settings():
+def open_settings(theme_path):
     if config_center.read_conf('Temp', 'temp_schedule'):
         w = Dialog(
             "暂时无法使用“设置”",
@@ -51,7 +51,7 @@ def open_settings():
 
     global settings
     if settings is None or not settings.isVisible():
-        settings = SettingsMenu()
+        settings = SettingsMenu(theme_path)
         settings.closed.connect(cleanup_settings)
         settings.show()
         logger.info('打开“设置”')
@@ -68,14 +68,14 @@ def cleanup_settings():
 
 
 class ExtraMenu(FluentWindow):
-    def __init__(self):
+    def __init__(self, theme_path):
         super().__init__()
         self.menu = None
         self.interface = uic.loadUi(f'{base_directory}/view/extra_menu.ui')
         self.initUI()
-        self.init_interface()
+        self.init_interface(theme_path)
 
-    def init_interface(self):
+    def init_interface(self, theme_path):
         ex_scroll = self.findChild(SmoothScrollArea, 'ex_scroll')
         QScroller.grabGesture(ex_scroll, QScroller.LeftMouseButtonGesture)
         select_temp_week = self.findChild(ComboBox, 'select_temp_week')  # 选择替换日期
@@ -103,7 +103,7 @@ class ExtraMenu(FluentWindow):
         save_temp_conf.clicked.connect(self.save_temp_conf)
 
         redirect_to_settings = self.findChild(HyperlinkButton, 'redirect_to_settings')
-        redirect_to_settings.clicked.connect(open_settings)
+        redirect_to_settings.clicked.connect(lambda: open_settings(theme_path))
 
     @staticmethod
     def load_schedule():
