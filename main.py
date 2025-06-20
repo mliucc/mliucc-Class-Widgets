@@ -2371,6 +2371,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def update_weather_data(self, weather_data):  # 更新天气数据(已兼容多api)
         global weather_name, temperature, weather_data_temp
+        alert_exclusion = config_center.read_conf('weather', 'alert_exclusion')
         if type(weather_data) is dict and hasattr(self, 'weather_icon') and 'error' not in weather_data:
             logger.success('已获取天气数据')
             original_weather_data = weather_data.copy()
@@ -2379,12 +2380,17 @@ class DesktopWidget(QWidget):  # 主要小组件
             self._reset_weather_alert_state()
             try:
                 unified_alert_data = get_unified_weather_alerts(original_weather_data)
-                self.current_alerts = unified_alert_data.get('all_alerts', [])
+                self.got_current_alerts = unified_alert_data.get('all_alerts', [])
+                self.current_alerts = []
                 self.current_alert_index = 0
-                logger.debug(f'获取到 {len(self.current_alerts)} 个天气预警')
-                if self.current_alerts:
-                    for i, alert in enumerate(self.current_alerts):
-                        logger.debug(f'预警 {i+1}: {alert.get("title", "未知")}')
+                if self.got_current_alerts:
+                    for i, alert in enumerate(self.got_current_alerts):
+                        if '海上大风' in str(alert):
+                            logger.debug(f'排除的预警 {i+1}: {alert.get("title", "未知")}')
+                        else:
+                            self.current_alerts.append(alert)
+                            logger.debug(f'预警 {i+1}: {alert.get("title", "未知")}')
+                logger.debug(f'获取到 {len(self.got_current_alerts)} 个天气预警，将显示{len(self.current_alerts)}个天气预警')
             except Exception as e:
                 logger.warning(f'获取预警数据失败：{e}')
                 self.current_alerts = []
