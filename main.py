@@ -348,7 +348,7 @@ def get_current_lessons() -> None:  # 获取当前课程
 # 获取倒计时、弹窗提示
 def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # 重构好累aaaa
     global last_notify_time
-    current_dt = TimeManagerFactory.get_instance().get_current_time()
+    current_dt = TimeManagerFactory.get_instance().get_current_time_()
     if last_notify_time and (current_dt - last_notify_time).seconds < notify_cooldown:
         return
     def after_school():  # 放学
@@ -358,7 +358,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
             if config_center.read_conf('Toast', 'after_school') == '1':
                 notification.push_notification(2)  # 放学
 
-    current_dt = TimeManagerFactory.get_instance().get_current_time()  # 当前时间
+    current_dt = TimeManagerFactory.get_instance().get_current_time_without_ms()  # 当前时间舍去毫秒，否则后面判定时间相等始终是False
     return_text = []
     got_return_data = False
 

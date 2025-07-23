@@ -440,6 +440,11 @@ class TimeManagerInterface(ABC):
     def get_current_time(self) -> dt.datetime:
         """获取程序内时间 (偏移后)"""
         pass
+
+    @abstractmethod
+    def get_current_time_without_ms(self) -> dt.datetime:
+        """获取程序内时间 (偏移后，舍去毫秒)"""
+        pass
     
     @abstractmethod
     def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
@@ -476,6 +481,10 @@ class LocalTimeManager(TimeManagerInterface):
         time_offset = float(self._config_center.read_conf('Time', 'time_offset', 0))
         return self.get_real_time() + dt.timedelta(seconds=time_offset)
     
+    def get_current_time_without_ms(self) -> dt.datetime:
+        """获取程序时间（含偏移，舍去毫秒）"""
+        return self.get_current_time().replace(microsecond=0))
+
     def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
         """获取格式化时间字符串"""
         return self.get_current_time().strftime(format_str)
@@ -606,6 +615,10 @@ class NTPTimeManager(TimeManagerInterface):
         time_offset = float(self._config_center.read_conf('Time', 'time_offset', 0))
         return self.get_real_time() + dt.timedelta(seconds=time_offset)
     
+    def get_current_time_without_ms(self) -> dt.datetime:
+        """获取程序时间（含偏移，舍去毫秒）"""
+        return self.get_current_time().replace(microsecond=0))
+
     def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
         """获取格式化时间字符串"""
         return self.get_current_time().strftime(format_str)
