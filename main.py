@@ -381,7 +381,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                                 after_school()
 
                     if current_dt == c_time - dt.timedelta(
-                            minutes=int(config_center.read_conf('Toast', 'prepare_minutes'))):
+                            minutes=int(config_center.read_conf('Toast', 'prepare_minutes'))) and current_dt != last_notify_time:
                         if config_center.read_conf('Toast',
                                                    'prepare_minutes') != '0' and toast and item_name.startswith('a'):
                             if not current_state:  # 课间
