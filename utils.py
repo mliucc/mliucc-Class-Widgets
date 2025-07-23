@@ -488,6 +488,10 @@ class LocalTimeManager(TimeManagerInterface):
         """获取当前星期几（0=周一, 6=周日）"""
         return self.get_current_time().weekday()
     
+    def get_time_offset(self) -> int:
+        """获取时差偏移(秒)"""
+        return float(self._config_center.read_conf('Time', 'time_offset', 0))
+
     def sync_with_ntp(self) -> bool:
         """为什么"""
         logger.warning("本地时间管理器不支持NTP同步")
