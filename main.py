@@ -371,7 +371,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                     # 判断时间是否上下课，发送通知
                     if current_dt == c_time and toast:
                         if item_name.startswith('a'):
-                            notification.push_notification(1, current_lesson_name)  # 上课
+                            notification.push_notification(1, next_lessons[0])  # 上课
                             last_notify_time = current_dt
                         else:
                             if next_lessons:  # 下课/放学
