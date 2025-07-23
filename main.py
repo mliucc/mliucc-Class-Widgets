@@ -348,7 +348,7 @@ def get_current_lessons() -> None:  # 获取当前课程
 # 获取倒计时、弹窗提示
 def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # 重构好累aaaa
     global last_notify_time
-    current_dt = TimeManagerFactory.get_instance().get_current_time_()
+    current_dt = TimeManagerFactory.get_instance().get_current_time()
     if last_notify_time and (current_dt - last_notify_time).seconds < notify_cooldown:
         return
     def after_school():  # 放学

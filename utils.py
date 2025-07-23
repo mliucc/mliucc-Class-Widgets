@@ -483,7 +483,7 @@ class LocalTimeManager(TimeManagerInterface):
     
     def get_current_time_without_ms(self) -> dt.datetime:
         """获取程序时间（含偏移，舍去毫秒）"""
-        return self.get_current_time().replace(microsecond=0))
+        return self.get_current_time().replace(microsecond=0)
 
     def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
         """获取格式化时间字符串"""
@@ -617,7 +617,7 @@ class NTPTimeManager(TimeManagerInterface):
     
     def get_current_time_without_ms(self) -> dt.datetime:
         """获取程序时间（含偏移，舍去毫秒）"""
-        return self.get_current_time().replace(microsecond=0))
+        return self.get_current_time().replace(microsecond=0)
 
     def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
         """获取格式化时间字符串"""
