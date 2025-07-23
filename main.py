@@ -389,8 +389,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                                 last_notify_time = current_dt
 
                     # 放学
-                    if (c_time + dt.timedelta(minutes=int(item_time)) == current_dt and not next_lessons and
-                            not current_state and toast):
+                    if (c_time + dt.timedelta(minutes=int(item_time)) == current_dt and not next_lessons and toast):
                         after_school()
                         last_notify_time = current_dt
 
