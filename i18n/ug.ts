@@ -7,23 +7,24 @@
         <location filename="../menu.py" line="1598"/>
         <source>系统 TTS（pyttsx3）用的是系统自带的语音服务噢~
 您可以在系统设置里添加更多语音(*≧▽≦)</source>
-        <translation type="unfinished"></translation>
+        <translation>Sistem TTS (pyttsx3) sistemning özide bar avaaz xizmitidin paydilinidu~
+Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation>
     </message>
     <message>
         <location filename="../menu.py" line="1600"/>
         <source>打开Windows语音设置</source>
-        <translation type="unfinished"></translation>
+        <translation>Windows avaaz bexatlirini ach</translation>
     </message>
     <message>
         <location filename="../menu.py" line="1605"/>
         <location filename="../menu.py" line="1614"/>
         <source>知道啦~</source>
-        <translation type="unfinished"></translation>
+        <translation>Tushundum~</translation>
     </message>
     <message>
         <location filename="../menu.py" line="1613"/>
         <source>这个语音引擎还没有提示信息呢~(・ω&lt;)</source>
-        <translation type="unfinished"></translation>
+        <translation>Bu avaaz injini hali yollanma uqturush bérmidi</translation>
     </message>
 </context>
 <context>
@@ -32,23 +33,23 @@
         <location filename="../main.py" line="1727"/>
         <location filename="../main.py" line="2078"/>
         <source>{year} 年 {month}</source>
-        <translation type="unfinished"></translation>
+        <translation>{month} {year}</translation>
     </message>
     <message>
         <location filename="../main.py" line="1729"/>
         <location filename="../main.py" line="2079"/>
         <source>{day}日  {week}</source>
-        <translation type="unfinished"></translation>
+        <translation>{day}  {week}</translation>
     </message>
     <message>
         <location filename="../main.py" line="2000"/>
         <source>完全隐藏/显示小组件</source>
-        <translation type="unfinished"></translation>
+        <translation>kichik komponentni toliq yoshur/körsət</translation>
     </message>
     <message>
         <location filename="../main.py" line="2001"/>
         <source>最小化为浮窗</source>
-        <translation type="unfinished"></translation>
+        <translation>suzghun kөzənəkchə dəp kichikləshtür</translation>
     </message>
     <message>
         <location filename="../main.py" line="2005"/>
@@ -58,53 +59,53 @@
     <message>
         <location filename="../main.py" line="2006"/>
         <source>额外选项</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Qoşumcha tallimlar</translation>
     </message>
     <message>
         <location filename="../main.py" line="2007"/>
         <source>设置</source>
-        <translation type="unfinished"></translation>
+        <translation>Bexat</translation>
     </message>
     <message>
         <location filename="../main.py" line="2010"/>
         <source>重新启动</source>
-        <translation type="unfinished"></translation>
+        <translation>Qaytidin qozghat</translation>
     </message>
     <message>
         <location filename="../main.py" line="2011"/>
         <source>退出</source>
-        <translation type="unfinished"></translation>
+        <translation>Chiqish</translation>
     </message>
     <message>
         <location filename="../main.py" line="2117"/>
         <source>&lt; - 分钟</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt; - Minut</translation>
     </message>
     <message>
         <location filename="../main.py" line="2119"/>
         <source>&lt;&#x2005;{minutes}&#x2005;分钟</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;&#x2005;{minutes}&#x2005;minut</translation>
     </message>
     <message>
         <location filename="../main.py" line="2127"/>
         <source>距离 {cd_text} 还有</source>
-        <translation type="unfinished"></translation>
+        <translation>{cd_text} gächä qaldı</translation>
     </message>
     <message>
         <location filename="../main.py" line="2325"/>
         <location filename="../main.py" line="2346"/>
         <source>预警</source>
-        <translation type="unfinished"></translation>
+        <translation>Xäbärdarlıq</translation>
     </message>
     <message>
         <location filename="../main.py" line="2348"/>
         <source>{data}预警</source>
-        <translation type="unfinished"></translation>
+        <translation>{data}Xäbärdarlıq</translation>
     </message>
     <message>
         <location filename="../main.py" line="2470"/>
         <source>{city} · 未知</source>
-        <translation type="unfinished"></translation>
+        <translation>{city} · Naməlum</translation>
     </message>
 </context>
 <context>
@@ -112,52 +113,52 @@
     <message>
         <location filename="../main.py" line="621"/>
         <source>Class Widgets 崩溃报告</source>
-        <translation type="unfinished"></translation>
+        <translation>Class Widgets çökiş habarati</translation>
     </message>
     <message>
         <location filename="../main.py" line="623"/>
         <source>抱歉！Class Widgets 发生了严重的错误从而无法正常运行。您可以保存下方的错误信息并向他人求助。若您认为这是程序的Bug，请点击“报告此问题”或联系开发者。</source>
-        <translation type="unfinished"></translation>
+        <translation>Kechürüng! Class Widgets da jiddiy xata yuz berdi, şüniŋ üçün normal ishlayalmaydu. Siz töwendiki xata melumatini saqlap, bashqalardin yardem soray alasiz. Eger buni programma bug dep oylisaŋiz, “Bu muammini habar qil” tugmasini basip yaki ishlabchiqarghuchilargha mu’rajaat qilisiz.</translation>
     </message>
     <message>
         <location filename="../main.py" line="638"/>
         <source>报告此问题</source>
-        <translation type="unfinished"></translation>
+        <translation>Bu muammini habar qil</translation>
     </message>
     <message>
         <location filename="../main.py" line="639"/>
         <source>复制日志</source>
-        <translation type="unfinished"></translation>
+        <translation>Jurnallarni köchür</translation>
     </message>
     <message>
         <location filename="../main.py" line="640"/>
         <source>忽略错误</source>
-        <translation type="unfinished"></translation>
+        <translation>Xatalarni nazar ätmäslik</translation>
     </message>
     <message>
         <location filename="../main.py" line="642"/>
         <source>在下次启动之前，忽略此错误</source>
-        <translation type="unfinished"></translation>
+        <translation>Keyingi qozghitishigha qädär, bu xatani ötüp ket</translation>
     </message>
     <message>
         <location filename="../main.py" line="643"/>
         <source>重新启动</source>
-        <translation type="unfinished"></translation>
+        <translation>Qaytidin qozghat</translation>
     </message>
     <message>
         <location filename="../main.py" line="647"/>
         <source>出错啦！ヽ(*。&gt;Д&lt;)o゜</source>
-        <translation type="unfinished"></translation>
+        <translation>Xata boldi! ヽ(*。&gt;Д&lt;)o゜</translation>
     </message>
     <message>
         <location filename="../main.py" line="683"/>
         <source>复制成功！ヾ(^▽^*)))</source>
-        <translation type="unfinished"></translation>
+        <translation>Köchürüp boldi! ヾ(^▽^*)))</translation>
     </message>
     <message>
         <location filename="../main.py" line="684"/>
         <source>日志已成功复制到剪贴板。</source>
-        <translation type="unfinished"></translation>
+        <translation>Jurnal müvəppəqiyyətlik köchürülüp, panjargha saqlandi.</translation>
     </message>
 </context>
 <context>
@@ -165,212 +166,212 @@
     <message>
         <location filename="../main.py" line="1435"/>
         <source>&lt; - 分钟</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt; - Minut</translation>
     </message>
     <message>
         <location filename="../main.py" line="1438"/>
         <source>&lt;&#x2005;{minutes}&#x2005;分钟</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;&#x2005;{minutes}&#x2005;minut</translation>
     </message>
 </context>
 <context>
     <name>Form</name>
     <message>
-        <location filename="../view/extra_menu.ui" line="14"/>
-        <location filename="../view/widget-toast-bar.ui" line="26"/>
-        <location filename="../view/menu/about.ui" line="14"/>
-        <location filename="../view/menu/advance.ui" line="20"/>
-        <location filename="../view/menu/configs.ui" line="20"/>
-        <location filename="../view/menu/countdown_custom_edit.ui" line="14"/>
-        <location filename="../view/menu/custom.ui" line="20"/>
-        <location filename="../view/menu/file_item.ui" line="14"/>
-        <location filename="../view/menu/help.ui" line="14"/>
-        <location filename="../view/menu/plugin_mgr.ui" line="14"/>
-        <location filename="../view/menu/preview.ui" line="14"/>
-        <location filename="../view/menu/schedule_db_edit.ui" line="14"/>
-        <location filename="../view/menu/schedule_edit.ui" line="14"/>
-        <location filename="../view/menu/sound.ui" line="20"/>
-        <location filename="../view/menu/subject.ui" line="14"/>
-        <location filename="../view/menu/timeline_edit.ui" line="14"/>
-        <location filename="../view/pp/home.ui" line="20"/>
+        <location filename="../view/pp/settings.ui" line="20"/>
         <location filename="../view/pp/latests.ui" line="20"/>
+        <location filename="../view/pp/home.ui" line="20"/>
         <location filename="../view/pp/plugin_detail.ui" line="20"/>
         <location filename="../view/pp/search.ui" line="20"/>
-        <location filename="../view/pp/settings.ui" line="20"/>
+        <location filename="../view/menu/advance.ui" line="20"/>
+        <location filename="../view/menu/about.ui" line="14"/>
+        <location filename="../view/menu/subject.ui" line="14"/>
+        <location filename="../view/menu/schedule_edit.ui" line="14"/>
+        <location filename="../view/menu/sound.ui" line="20"/>
+        <location filename="../view/menu/help.ui" line="14"/>
+        <location filename="../view/menu/plugin_mgr.ui" line="14"/>
+        <location filename="../view/menu/custom.ui" line="20"/>
+        <location filename="../view/menu/schedule_db_edit.ui" line="14"/>
+        <location filename="../view/menu/configs.ui" line="20"/>
+        <location filename="../view/menu/timeline_edit.ui" line="14"/>
+        <location filename="../view/menu/file_item.ui" line="14"/>
+        <location filename="../view/menu/preview.ui" line="14"/>
+        <location filename="../view/menu/countdown_custom_edit.ui" line="14"/>
+        <location filename="../view/extra_menu.ui" line="14"/>
+        <location filename="../view/widget-toast-bar.ui" line="26"/>
         <source>Form</source>
-        <translation type="unfinished"></translation>
+        <translation>Form</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="35"/>
         <source>额外选项</source>
-        <translation type="unfinished"></translation>
+        <translation>Qoşumcha tallimlar</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="45"/>
         <source>调休</source>
-        <translation type="unfinished"></translation>
+        <translation>Özgärtirilgen dinlenish</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="84"/>
         <source>设置调休星期</source>
-        <translation type="unfinished"></translation>
+        <translation>Özgärtirilgen dinlenish heptisini bexat qilish</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="91"/>
         <source>将替换当前调休日的课程表为选定星期</source>
-        <translation type="unfinished"></translation>
+        <translation>Häzirqi özgärtirilgen dinlenish künidiki derslik jädwälin, tallanğan heptä bilen almashturidu</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="128"/>
         <source>换课</source>
-        <translation type="unfinished"></translation>
+        <translation>Ders almashturush</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="135"/>
         <source>临时替换当天的课程，重启后失效</source>
-        <translation type="unfinished"></translation>
+        <translation>Bir künlük dersni müwäqqit almashturush, qaytidin qozghitishidin keyin ishlemsiz bolidu</translation>
     </message>
     <message>
-        <location filename="../view/extra_menu.ui" line="208"/>
         <location filename="../view/menu/schedule_edit.ui" line="294"/>
+        <location filename="../view/extra_menu.ui" line="208"/>
         <source>课程/活动</source>
-        <translation type="unfinished"></translation>
+        <translation>Ders/Tädbir</translation>
     </message>
     <message>
-        <location filename="../view/extra_menu.ui" line="234"/>
         <location filename="../view/menu/schedule_edit.ui" line="320"/>
+        <location filename="../view/extra_menu.ui" line="234"/>
         <source>自定义课程</source>
-        <translation type="unfinished"></translation>
+        <translation>Özige xas ders</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="280"/>
         <source>*所有更改在重启后重置</source>
-        <translation type="unfinished"></translation>
+        <translation>*Bärchä özgärtürmälär qaytidin qozghitishidin keyin täzälänidu</translation>
     </message>
     <message>
         <location filename="../view/extra_menu.ui" line="287"/>
         <source>浏览更多设置</source>
-        <translation type="unfinished"></translation>
+        <translation>Köproq bexatlarni körüp chiq</translation>
     </message>
     <message>
-        <location filename="../view/extra_menu.ui" line="306"/>
-        <location filename="../view/menu/countdown_custom_edit.ui" line="229"/>
-        <location filename="../view/menu/schedule_db_edit.ui" line="160"/>
-        <location filename="../view/menu/schedule_edit.ui" line="378"/>
         <location filename="../view/menu/subject.ui" line="89"/>
+        <location filename="../view/menu/schedule_edit.ui" line="378"/>
+        <location filename="../view/menu/schedule_db_edit.ui" line="160"/>
         <location filename="../view/menu/timeline_edit.ui" line="520"/>
+        <location filename="../view/menu/countdown_custom_edit.ui" line="229"/>
+        <location filename="../view/extra_menu.ui" line="306"/>
         <source>保存</source>
-        <translation type="unfinished"></translation>
+        <translation>Saqla</translation>
     </message>
     <message>
         <location filename="../view/widget-toast-bar.ui" line="123"/>
         <source>上课</source>
-        <translation type="unfinished"></translation>
+        <translation>dərs</translation>
     </message>
     <message>
         <location filename="../view/widget-toast-bar.ui" line="151"/>
         <source>当前课程</source>
-        <translation type="unfinished"></translation>
+        <translation>hazirqi dərs</translation>
     </message>
     <message>
         <location filename="../view/widget-toast-bar.ui" line="170"/>
         <source>英语</source>
-        <translation type="unfinished"></translation>
+        <translation>inglizchə</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="35"/>
         <source>关于</source>
-        <translation type="unfinished"></translation>
+        <translation>toghrisida</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="118"/>
         <source>Class Widgets</source>
-        <translation type="unfinished"></translation>
+        <translation>Class Widgets</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="128"/>
         <source>Class Widgets 是一款能显示当前课程的桌面组件App。其提供了直观的图形化课程表编辑和美观的桌面组件。</source>
-        <translation type="unfinished"></translation>
+        <translation>Class Widgets hazirqi dərsni körsitidiγan üstəl üchi komponent App. U körmə arqiliq grafikliq dərs jədvili təhrirləsh wə chirayli üstəl üchi komponentlirini təminləydu.</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="232"/>
         <source>版本号:获取失败！</source>
-        <translation type="unfinished"></translation>
+        <translation>nəshir nomuri: erishshə almidi!</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="259"/>
         <source>编译日期</source>
-        <translation type="unfinished"></translation>
+        <translation>kompilasiye chislisi</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="266"/>
         <location filename="../view/menu/about.ui" line="303"/>
         <location filename="../view/menu/about.ui" line="340"/>
         <source>获取失败！</source>
-        <translation type="unfinished"></translation>
+        <translation>erishshə almidi!</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="296"/>
         <source>Build Commit</source>
-        <translation type="unfinished"></translation>
+        <translation>Build Commit</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="333"/>
         <source>Build UUID</source>
-        <translation type="unfinished"></translation>
+        <translation>Build UUID</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="359"/>
         <source>检查更新</source>
-        <translation type="unfinished"></translation>
+        <translation>yangilanmini tەkshür</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="397"/>
         <source>此项目的 Github</source>
-        <translation type="unfinished"></translation>
+        <translation>Github</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="425"/>
         <source>我的 哔哩哔哩 主页</source>
-        <translation type="unfinished"></translation>
+        <translation>RinLit&apos;s Bilibili homepage</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="460"/>
         <source>查看开放源代码许可</source>
-        <translation type="unfinished"></translation>
+        <translation>ochiq mənbə kodi ijazinamisini kör</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="498"/>
         <source>鸣谢</source>
-        <translation type="unfinished"></translation>
+        <translation>tەshəkkür</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="522"/>
         <source>更新</source>
-        <translation type="unfinished"></translation>
+        <translation>yangilanma</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="557"/>
         <source>选择更新通道</source>
-        <translation type="unfinished"></translation>
+        <translation>yangilanma kanilini tallaⁿ</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="564"/>
         <source>将会获取选定更新通道的版本</source>
-        <translation type="unfinished"></translation>
+        <translation>tallanghan yangilanma kanilining nəshirini alishu</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="635"/>
         <source>启动 Class Widgets 时自动检查更新</source>
-        <translation type="unfinished"></translation>
+        <translation>Class Widgets qozghalghan chaghda yangilanmini aptomat təkshür</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="642"/>
         <source>若启用，Class Widgets 将在启动时联网检查选定的更新通道中是否有最新版本更新。</source>
-        <translation type="unfinished"></translation>
+        <translation>agar qozghitilsa, Class Widgets qozghalghan chaghda torqa ulinip tallanghan yangilanma kanilida əng yəngi nəshir yangilanmisi barmu yoqmu təkshüridu.</translation>
     </message>
     <message>
-        <location filename="../view/menu/about.ui" line="668"/>
+        <location filename="../view/pp/settings.ui" line="144"/>
         <location filename="../view/menu/advance.ui" line="143"/>
         <location filename="../view/menu/advance.ui" line="685"/>
         <location filename="../view/menu/advance.ui" line="1167"/>
@@ -378,119 +379,119 @@
         <location filename="../view/menu/advance.ui" line="1668"/>
         <location filename="../view/menu/advance.ui" line="1760"/>
         <location filename="../view/menu/advance.ui" line="1835"/>
+        <location filename="../view/menu/about.ui" line="668"/>
         <location filename="../view/menu/sound.ui" line="136"/>
         <location filename="../view/menu/sound.ui" line="214"/>
         <location filename="../view/menu/sound.ui" line="292"/>
         <location filename="../view/menu/sound.ui" line="383"/>
         <location filename="../view/menu/sound.ui" line="608"/>
         <location filename="../view/menu/sound.ui" line="687"/>
-        <location filename="../view/pp/settings.ui" line="144"/>
         <source>启用</source>
-        <translation type="unfinished"></translation>
+        <translation>qozghat</translation>
     </message>
     <message>
-        <location filename="../view/menu/about.ui" line="671"/>
+        <location filename="../view/pp/settings.ui" line="147"/>
         <location filename="../view/menu/advance.ui" line="1170"/>
         <location filename="../view/menu/advance.ui" line="1340"/>
         <location filename="../view/menu/advance.ui" line="1671"/>
         <location filename="../view/menu/advance.ui" line="1763"/>
         <location filename="../view/menu/advance.ui" line="1838"/>
+        <location filename="../view/menu/about.ui" line="671"/>
         <location filename="../view/menu/sound.ui" line="139"/>
         <location filename="../view/menu/sound.ui" line="217"/>
         <location filename="../view/menu/sound.ui" line="295"/>
         <location filename="../view/menu/sound.ui" line="386"/>
         <location filename="../view/menu/sound.ui" line="611"/>
         <location filename="../view/menu/sound.ui" line="690"/>
-        <location filename="../view/pp/settings.ui" line="147"/>
         <source>禁用</source>
-        <translation type="unfinished"></translation>
+        <translation>chəklə</translation>
     </message>
     <message>
         <location filename="../view/menu/about.ui" line="700"/>
         <source>Copyright © 2025 RinLit, All Rights Reversed.</source>
-        <translation type="unfinished"></translation>
+        <translation>Copyright © 2025 RinLit, All Rights Reversed.</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="41"/>
         <source>高级选项</source>
-        <translation type="unfinished"></translation>
+        <translation>aliy tallanmilar</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="71"/>
         <source>课程</source>
-        <translation type="unfinished"></translation>
+        <translation>dərs</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="271"/>
         <source>时差偏移</source>
-        <translation type="unfinished"></translation>
+        <translation>waqit pərqi siljiⁿ</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="278"/>
         <source>修正系统时间与学校铃声的时差，学校铃声慢于系统时间为正值，反之为负</source>
-        <translation type="unfinished"></translation>
+        <translation>sistəma waqti bilən məktəp qoⁿghuraq waqtining pərqini tüzət, məktəp qoⁿghuraq sistəma waqtindin asta bolsa müsbət san, əksichə bolsa mənpi san</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="110"/>
         <source>启用 单/双 周课表</source>
-        <translation type="unfinished"></translation>
+        <translation>bir/qosh həptə dərs jədvilini qozghat</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="117"/>
         <source>若要启用此选项，需设定开学日期以计算</source>
-        <translation type="unfinished"></translation>
+        <translation>bu tallanmini qozghatmaⁿ üchün, məktəp achilish chislisini bəlgiləsh kerək həsablaⁿ üchün</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="146"/>
         <location filename="../view/menu/advance.ui" line="688"/>
         <source>关闭</source>
-        <translation type="unfinished"></translation>
+        <translation>yap</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="188"/>
         <location filename="../view/menu/advance.ui" line="221"/>
         <source>选取开学日期</source>
-        <translation type="unfinished"></translation>
+        <translation>Oqush bashlinidighan künni talla</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="195"/>
         <source>将用于计算单/双周，开学日期需设置为开学第一周第一天（即周一）</source>
-        <translation type="unfinished"></translation>
+        <translation>bir/qosh həptini hesablaⁿ üchün ishlətilidu, məktəp achilish chislisi məktəp achilish birinchi həptisining birinchi küni (yəni dünshənbə) dəp bəlgilənishi kerək</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="238"/>
         <source>时间</source>
-        <translation type="unfinished"></translation>
+        <translation>waqit</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="349"/>
         <source>时间获得方法</source>
-        <translation type="unfinished"></translation>
+        <translation>waqit ëlish usuli</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="356"/>
         <source>选择时间获得方法</source>
-        <translation type="unfinished"></translation>
+        <translation>waqit ëlish usulini tallaⁿ</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="457"/>
         <source>NTP服务器</source>
-        <translation type="unfinished"></translation>
+        <translation>NTP muxidimətchisi</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="464"/>
         <source>使用url链接NTP服务器同步时间</source>
-        <translation type="unfinished"></translation>
+        <translation>url ulanghan NTP muxidimətchisini ishlətp waqitni muttasil qil</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="544"/>
         <source>NTP同步使用的时区</source>
-        <translation type="unfinished"></translation>
+        <translation>NTP muttasil qilishta ishlitilighan waqit rayoni</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="551"/>
         <source>NTP同步时应使用的时区</source>
-        <translation type="unfinished"></translation>
+        <translation>NTP muttasil qilghan chaghda ishlitilishi kerək bolghan waqit rayoni</translation>
     </message>
     <message>
         <location filename="../view/menu/advance.ui" line="622"/>
@@ -747,8 +748,8 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../view/menu/preview.ui" line="35"/>
         <location filename="../view/menu/schedule_edit.ui" line="44"/>
+        <location filename="../view/menu/preview.ui" line="35"/>
         <source>课程表</source>
         <translation type="unfinished"></translation>
     </message>
@@ -908,22 +909,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../view/menu/plugin_mgr.ui" line="706"/>
+        <location filename="../view/menu/plugin_mgr.ui" line="712"/>
         <location filename="../view/menu/custom.ui" line="738"/>
         <location filename="../view/menu/custom.ui" line="744"/>
         <location filename="../view/menu/custom.ui" line="816"/>
         <location filename="../view/menu/custom.ui" line="822"/>
         <location filename="../view/menu/custom.ui" line="911"/>
         <location filename="../view/menu/custom.ui" line="917"/>
-        <location filename="../view/menu/plugin_mgr.ui" line="706"/>
-        <location filename="../view/menu/plugin_mgr.ui" line="712"/>
         <source>关</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../view/menu/plugin_mgr.ui" line="709"/>
         <location filename="../view/menu/custom.ui" line="741"/>
         <location filename="../view/menu/custom.ui" line="819"/>
         <location filename="../view/menu/custom.ui" line="914"/>
-        <location filename="../view/menu/plugin_mgr.ui" line="709"/>
         <source>开</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1098,8 +1099,8 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../view/menu/plugin_mgr.ui" line="35"/>
         <location filename="../view/pp/settings.ui" line="71"/>
+        <location filename="../view/menu/plugin_mgr.ui" line="35"/>
         <source>插件</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1214,8 +1215,8 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../view/menu/preview.ui" line="50"/>
         <location filename="../view/menu/sound.ui" line="742"/>
+        <location filename="../view/menu/preview.ui" line="50"/>
         <source>预览</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1493,7 +1494,7 @@
     <message>
         <location filename="../view/pp/settings.ui" line="41"/>
         <source>设置</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Bexat</translation>
     </message>
     <message>
         <location filename="../view/pp/settings.ui" line="104"/>
@@ -1620,7 +1621,7 @@
     <message>
         <location filename="../plugin_plaza.py" line="420"/>
         <source>更新</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">yangilanma</translation>
     </message>
 </context>
 <context>
@@ -1644,7 +1645,7 @@
     <message>
         <location filename="../plugin_plaza.py" line="308"/>
         <source>更新</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">yangilanma</translation>
     </message>
     <message>
         <location filename="../plugin_plaza.py" line="314"/>
@@ -1855,7 +1856,7 @@
     <message>
         <location filename="../menu.py" line="1588"/>
         <source>知道啦~</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Tushundum~</translation>
     </message>
     <message>
         <location filename="../menu.py" line="1629"/>
@@ -2462,7 +2463,7 @@
         <location filename="../menu.py" line="3217"/>
         <location filename="../menu.py" line="3218"/>
         <source>获取失败！</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">erishshə almidi!</translation>
     </message>
     <message>
         <location filename="../menu.py" line="3238"/>
@@ -2635,7 +2636,7 @@
         <location filename="../menu.py" line="3817"/>
         <location filename="../menu.py" line="3972"/>
         <source>课程</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">dərs</translation>
     </message>
     <message>
         <location filename="../menu.py" line="3955"/>
@@ -2747,7 +2748,7 @@
     <message>
         <location filename="../menu.py" line="4384"/>
         <source>高级选项</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">aliy tallanmilar</translation>
     </message>
     <message>
         <location filename="../menu.py" line="4385"/>
@@ -2812,12 +2813,12 @@
     <message>
         <location filename="../view/menu/tts_settings.ui" line="169"/>
         <source>启用</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">qozghat</translation>
     </message>
     <message>
         <location filename="../view/menu/tts_settings.ui" line="172"/>
         <source>禁用</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">chəklə</translation>
     </message>
     <message>
         <location filename="../view/menu/tts_settings.ui" line="208"/>
@@ -3355,7 +3356,7 @@
         <location filename="../list_.py" line="64"/>
         <location filename="../list_.py" line="169"/>
         <source>英语</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">inglizchə</translation>
     </message>
     <message>
         <location filename="../list_.py" line="35"/>
@@ -3483,7 +3484,7 @@
     <message>
         <location filename="../list_.py" line="58"/>
         <source>课程</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">dərs</translation>
     </message>
     <message>
         <location filename="../list_.py" line="59"/>
@@ -3791,12 +3792,12 @@
     <message>
         <location filename="../menu.py" line="598"/>
         <source>禁用</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">chəklə</translation>
     </message>
     <message>
         <location filename="../menu.py" line="599"/>
         <source>启用</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">qozghat</translation>
     </message>
     <message>
         <location filename="../menu.py" line="644"/>
@@ -3863,7 +3864,7 @@
     <message>
         <location filename="../tip_toast.py" line="110"/>
         <source>当前课程</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">hazirqi dərs</translation>
     </message>
     <message>
         <location filename="../tip_toast.py" line="117"/>
