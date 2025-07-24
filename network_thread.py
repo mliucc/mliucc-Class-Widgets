@@ -1,8 +1,9 @@
-import json
 import os
+import json
 import shutil
 import zipfile  # 解压插件zip
 from datetime import datetime
+from typing import Optional, Union, List, Tuple, Dict, Any
 
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
@@ -11,9 +12,11 @@ from packaging.version import Version
 
 import conf
 import utils
-import weather_db as db
+import weather as db
+from weather import WeatherReportThread as weatherReportThread
 from conf import base_directory
 from file import config_center
+import list_
 
 headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache"}  # 设置请求头
 # proxies = {"http": "http://127.0.0.1:10809", "https": "http://127.0.0.1:10809"}  # 加速访问
@@ -44,19 +47,19 @@ class getRepoFileList(QThread):  # 获取仓库文件目录
     repo_signal = pyqtSignal(dict)
 
     def __init__(
-            self, url='https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner.json'
-    ):
+            self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner.json'
+    ) -> None:
         super().__init__()
         self.download_url = url
 
-    def run(self):
+    def run(self) -> None:
         try:
             plugin_info_data = self.get_plugin_info()
             self.repo_signal.emit(plugin_info_data)
         except Exception as e:
             logger.error(f"触发banner信息失败: {e}")
 
-    def get_plugin_info(self):
+    def get_plugin_info(self) -> Dict[str, Any]:
         try:
             mirror_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')]
             url = f"{mirror_url}{self.download_url}"
@@ -76,19 +79,19 @@ class getPluginInfo(QThread):  # 获取插件信息(json)
     repo_signal = pyqtSignal(dict)
 
     def __init__(
-            self, url='https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plugin_list.json'
-    ):
+            self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plugin_list.json'
+    ) -> None:
         super().__init__()
         self.download_url = url
 
-    def run(self):
+    def run(self) -> None:
         try:
             plugin_info_data = self.get_plugin_info()
             self.repo_signal.emit(plugin_info_data)
         except Exception as e:
             logger.error(f"触发插件信息失败: {e}")
 
-    def get_plugin_info(self):
+    def get_plugin_info(self) -> Dict[str, Any]:
         try:
             mirror_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')]
             url = f"{mirror_url}{self.download_url}"
@@ -108,19 +111,19 @@ class getTags(QThread):  # 获取插件标签(json)
     repo_signal = pyqtSignal(dict)
 
     def __init__(
-            self, url='https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plaza_detail.json'
-    ):
+            self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plaza_detail.json'
+    ) -> None:
         super().__init__()
         self.download_url = url
 
-    def run(self):
+    def run(self) -> None:
         try:
             plugin_info_data = self.get_plugin_info()
             self.repo_signal.emit(plugin_info_data)
         except Exception as e:
             logger.error(f"触发Tag信息失败: {e}")
 
-    def get_plugin_info(self):
+    def get_plugin_info(self) -> Dict[str, Any]:
         try:
             mirror_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')]
             url = f"{mirror_url}{self.download_url}"
@@ -139,11 +142,11 @@ class getTags(QThread):  # 获取插件标签(json)
 class getImg(QThread):  # 获取图片
     repo_signal = pyqtSignal(bytes)
 
-    def __init__(self, url='https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner_1.png'):
+    def __init__(self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner_1.png') -> None:
         super().__init__()
         self.download_url = url
 
-    def run(self):
+    def run(self) -> None:
         try:
             banner_data = self.get_banner()
             if banner_data is not None:
@@ -154,7 +157,7 @@ class getImg(QThread):  # 获取图片
         except Exception as e:
             logger.error(f"触发图片失败: {e}")
 
-    def get_banner(self):
+    def get_banner(self) -> Optional[bytes]:
         try:
             mirror_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')]
             url = f"{mirror_url}{self.download_url}"
@@ -172,18 +175,18 @@ class getImg(QThread):  # 获取图片
 class getReadme(QThread):  # 获取README
     html_signal = pyqtSignal(str)
 
-    def __init__(self, url='https://raw.githubusercontent.com/Class-Widgets/Class-Widgets/main/README.md'):
+    def __init__(self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/Class-Widgets/main/README.md') -> None:
         super().__init__()
         self.download_url = url
 
-    def run(self):
+    def run(self) -> None:
         try:
             readme_data = self.get_readme()
             self.html_signal.emit(readme_data)
         except Exception as e:
             logger.error(f"触发README失败: {e}")
 
-    def get_readme(self):
+    def get_readme(self) -> str:
         try:
             mirror_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')]
             url = f"{mirror_url}{self.download_url}"
@@ -200,18 +203,18 @@ class getReadme(QThread):  # 获取README
 
 class getCity(QThread):
 
-    def __init__(self, url='https://qifu-api.baidubce.com/ip/local/geo/v1/district'):
+    def __init__(self, url: str = 'https://qifu-api.baidubce.com/ip/local/geo/v1/district') -> None:
         super().__init__()
         self.download_url = url
 
-    def run(self):
+    def run(self) -> None:
         try:
             city_data = self.get_city()
             config_center.write_conf('Weather', 'city', db.search_code_by_name(city_data))
         except Exception as e:
             logger.error(f"获取城市失败: {e}")
 
-    def get_city(self):
+    def get_city(self) -> Tuple[str, str]:
         try:
             req = requests.get(self.download_url, proxies=proxies)
             if req.status_code == 200:
@@ -236,18 +239,18 @@ class VersionThread(QThread):  # 获取最新版本号
     version_signal = pyqtSignal(dict)
     _instance_running = False
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-    def run(self):
+    def run(self) -> None:
         version = self.get_latest_version()
         self.version_signal.emit(version)
     
     @classmethod
-    def is_running(cls):
+    def is_running(cls) -> bool:
         return cls._instance_running
 
     @staticmethod
-    def get_latest_version():
+    def get_latest_version() -> Dict[str, Any]:
         url = "https://classwidgets.rinlit.cn/version.json"
         try:
             logger.info(f"正在获取版本信息")
@@ -268,12 +271,12 @@ class getDownloadUrl(QThread):
     # 定义信号，通知下载进度或完成
     geturl_signal = pyqtSignal(str)
 
-    def __init__(self, username, repo):
+    def __init__(self, username: str, repo: str) -> None:
         super().__init__()
         self.username = username
         self.repo = repo
 
-    def run(self):
+    def run(self) -> None:
         try:
             url = f"https://api.github.com/repos/{self.username}/{self.repo}/releases/latest"
             response = requests.get(url, proxies=proxies)
@@ -300,7 +303,7 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
     progress_signal = pyqtSignal(float)  # 进度
     status_signal = pyqtSignal(str)  # 状态
 
-    def __init__(self, url, plugin_name='test_114'):
+    def __init__(self, url: str, plugin_name: str = 'test_114') -> None:
         super().__init__()
         self.download_url = url
         print(self.download_url)
@@ -308,7 +311,7 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
         self.plugin_name = plugin_name
         self.extract_dir = conf.PLUGINS_DIR  # 插件目录
 
-    def run(self):
+    def run(self) -> None:
         try:
             enabled_plugins = conf.load_plugin_config()  # 加载启用的插件
 
@@ -337,11 +340,11 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
             self.status_signal.emit(f"错误: {e}")
             logger.error(f"插件下载/解压失败: {e}")
 
-    def stop(self):
+    def stop(self) -> None:
         self._running = False
         self.terminate()
 
-    def download_file(self, file_path):
+    def download_file(self, file_path: str) -> None:
         # time.sleep(555)  # 模拟下载时间
         try:
             self.download_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')] + self.download_url
@@ -365,7 +368,7 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
             self.status_signal.emit(f'ERROR: {e}')
             logger.error(f"插件下载错误: {e}")
 
-    def extract_zip(self, zip_path):
+    def extract_zip(self, zip_path: str) -> None:
         try:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(self.extract_dir)
@@ -384,7 +387,7 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
             logger.error(f"解压失败: {e}")
 
 
-def check_update():
+def check_update() -> None:
     global threads
 
     if VersionThread.is_running():
@@ -401,7 +404,7 @@ def check_update():
     version_thread.start()
 
 
-def check_version(version):  # 检查更新
+def check_version(version: Dict[str, Any]) -> bool:  # 检查更新
     global threads
     for thread in threads:
         thread.terminate()
@@ -413,71 +416,69 @@ def check_version(version):  # 检查更新
         )
         return False
     
-    channel = int(config_center.read_conf("Other", "version_channel"))
+    channel = int(config_center.read_conf("Version", "version_channel"))
     server_version = version['version_release' if channel == 0 else 'version_beta']
-    local_version = config_center.read_conf("Other", "version")
+    local_version = config_center.read_conf("Version", "version")
     logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
     if Version(server_version) > Version(local_version):
         utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
 
-class weatherReportThread(QThread):  # 获取最新天气信息
-    weather_signal = pyqtSignal(dict)
 
-    def __init__(self):
+class scheduleThread(QThread):  # 获取课表
+    update_signal = pyqtSignal(dict)
+
+    def __init__(self,url:str, method:str='GET', data:dict=None):
         super().__init__()
+        self.url = url
+        self.method = method
+        self.data = data
+
+        for db in list_.schedule_dbs:
+            if self.url.startswith(f"{db}/"):
+                self.url = f"{list_.schedule_dbs[db]}/{self.url[len(db)+1:]}"
+                break
 
     def run(self):
+        # 获取
+        if self.method == 'GET':
+            data = self.get_schedule()
+        elif self.method == 'POST':
+            data = self.post_schedule()
+        else:
+            data = {'error': "method not supported"}
+        
+        if not isinstance(data, dict):
+            logger.error(f"获取课表失败，返回数据不是字典类型: {data}")
+            data = {'error': "获取课表失败，返回数据不是字典类型"}
+        # 发射信号
+        self.update_signal.emit(data)
+
+    def get_schedule(self):
         try:
-            weather_data = self.get_weather_data()
-            self.weather_signal.emit(weather_data)
+            logger.info(f"正在获取课表 {self.url}")
+            response = requests.get(self.url, proxies=proxies, timeout=30)
+            logger.debug(f"课表 {self.url} 请求响应: {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
+                return json.loads(data.get('data', "{'error': f\"没有 data 项\"}"))
+            else:
+                logger.error(f"无法获取课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
+                return {'error': f"请求失败，错误代码：{response.status_code}"}
         except Exception as e:
-            logger.error(f"触发天气信息失败: {e}")
-        finally:
-            self.deleteLater()
-
-    @staticmethod
-    def get_weather_data():
-        location_key = config_center.read_conf('Weather', 'city')
-        if location_key == '0':
-            city_thread = getCity()
-            loop = QEventLoop()
-            city_thread.finished.connect(loop.quit)
-            city_thread.start()
-            loop.exec_()  # 阻塞到完成
-            location_key = config_center.read_conf('Weather', 'city')
-            if location_key == '0' or not location_key:
-                location_key = 101010100
-        days = 1
-        key = config_center.read_conf('Weather', 'api_key')
-        url = db.get_weather_url().format(location_key=location_key, days=days, key=key)
-        alert_url = db.get_weather_alert_url()
+            logger.error(f"请求失败，错误详情：{str(e)}")
+            return {"error": f"请求失败\n{str(e)}"}
+        
+    def post_schedule(self):
         try:
-            data_group = {'now': {}, 'alert': {}}
-            response_now = requests.get(url, proxies=proxies)  # 禁用代理
-            if alert_url == 'NotSupported':
-                logger.warning(f"当前API不支持天气预警信息")
-            elif alert_url is None:
-                logger.warning(f"无单独天气预警信息API")
+            logger.info(f"正在上传课表 {self.url}")
+            response = requests.post(self.url, proxies=proxies, timeout=30, json={"data": json.dumps(self.data)})
+            logger.debug(f"课表 {self.url} 请求响应: {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
+                return json.loads(data.get('data', "{'error': f\"没有 data 项\"}"))
             else:
-                alert_url = alert_url.format(location_key=location_key, key=key)
-                response_alert = requests.get(alert_url, proxies=proxies)
-
-                if response_alert.status_code == 200:
-                    data_alert = response_alert.json()
-                    data_group['alert'] = data_alert
-                else:
-                    logger.error(f"获取天气预警信息失败：{response_alert.status_code}")
-
-            if response_now.status_code == 200:
-                data = response_now.json()
-                data_group['now'] = data
-                return data_group
-            else:
-                logger.error(f"获取天气信息失败：{response_now.status_code}")
-                return {'error': {'info': {'value': '错误', 'unit': response_now.status_code}}}
-        except requests.exceptions.RequestException as e:  # 请求失败
-            logger.error(f"获取天气信息失败：{e}")
-            return {'error': {'info': {'value': '错误', 'unit': ''}}}
+                logger.error(f"无法上传课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
+                return {'error': f"请求失败，错误代码：{response.status_code}"}
         except Exception as e:
-            logger.error(f"获取天气信息失败：{e}")
-            return {'error': {'info': {'value': '错误', 'unit': ''}}}
+            logger.error(f"请求失败，错误详情：{str(e)}")
+            return {"error": f"请求失败\n{str(e)}"}
