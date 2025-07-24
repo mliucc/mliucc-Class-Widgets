@@ -358,7 +358,8 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
             if config_center.read_conf('Toast', 'after_school') == '1':
                 notification.push_notification(2)  # 放学
 
-    current_dt = TimeManagerFactory.get_instance().get_current_time_without_ms()  # 当前时间舍去毫秒，否则后面判定时间相等始终是False
+    # 当前时间舍去毫秒，否则后面判定时间相等始终是False
+    current_dt = TimeManagerFactory.get_instance().get_current_time_without_ms()  
     return_text = []
     got_return_data = False
 
@@ -389,7 +390,8 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                                 last_notify_time = current_dt
 
                     # 放学
-                    if (c_time + dt.timedelta(minutes=int(item_time)) == current_dt and not next_lessons and toast):
+                    if (c_time + dt.timedelta(minutes=int(item_time)) == current_dt 
+                        and not next_lessons and toast):
                         after_school()
                         last_notify_time = current_dt
 
