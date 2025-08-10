@@ -1,20 +1,21 @@
-import datetime as dt
+import datetime
 import json
 import os
-import re
 import platform
+import re
+import shutil
 import subprocess
 import sys
+import zipfile
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
 import re
 import zipfile
 import shutil
-import asyncio
 
 from PyQt5 import uic, QtCore
-from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QSize, QThread, QTranslator, QObject, QTimer
+from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QSize, QThread, QTranslator, QObject, QTimer, QLocale
 from PyQt5.QtGui import QIcon, QDesktopServices, QColor
 # from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF
@@ -22,40 +23,51 @@ from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QApplication, QHeaderView, QTableWidgetItem, QLabel, QHBoxLayout, QSizePolicy, \
     QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget, QFrame, QListWidgetItem, QWidget, QStyle
 from packaging.version import Version
+from typing import Tuple, Union
+
 from loguru import logger
+from packaging.version import Version
+from PyQt5 import uic, QtCore
+from PyQt5.QtCore import QObject, QThread, QTimer, QTranslator, QUrl, QDate, QLocale, QTime, Qt, pyqtSignal, QSize
+from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
+from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtWidgets import (
+    QApplication, QFileDialog, QFrame, QHeaderView, QHBoxLayout, QLabel, QListWidgetItem, QScroller, 
+    QSpacerItem, QTableWidgetItem, QVBoxLayout, QWidget, QSizePolicy
+)
 from qfluentwidgets import (
-    Theme, setTheme, FluentWindow, FluentIcon as fIcon, ToolButton, ListWidget, ComboBox, CaptionLabel,
-    SpinBox, LineEdit, PrimaryPushButton, TableWidget, Flyout, InfoBarIcon, InfoBar, InfoBarPosition,
-    FlyoutAnimationType, NavigationItemPosition, MessageBox, SubtitleLabel, PushButton, SwitchButton,
-    CalendarPicker, BodyLabel, ColorDialog, isDarkTheme, TimeEdit, EditableComboBox, MessageBoxBase,
-    SearchLineEdit, Slider, PlainTextEdit, ToolTipFilter, ToolTipPosition, RadioButton, HyperlinkLabel,
-    PrimaryDropDownPushButton, Action, RoundMenu, CardWidget, ImageLabel, StrongBodyLabel, TimePicker, FlyoutViewBase,
-    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, TableWidget, HyperlinkButton, DropDownToolButton, HyperlinkLabel, themeColor, FlyoutView
+    Action, BodyLabel, CalendarPicker, CaptionLabel, CardWidget, ColorDialog, ComboBox, Dialog,
+    DisplayLabel, DropDownToolButton, EditableComboBox, FluentIcon as fIcon,
+    FluentTranslator, FluentWindow, Flyout, FlyoutAnimationType, FlyoutView, FlyoutViewBase,
+    HyperlinkLabel, ImageLabel, InfoBar, InfoBarIcon, InfoBarPosition, isDarkTheme, LineEdit, FlowLayout,
+    ListWidget, MessageBox, MessageBoxBase, NavigationItemPosition, PlainTextEdit, PrimaryDropDownPushButton, 
+    PrimaryPushButton, PushButton, RadioButton, RoundMenu, SearchLineEdit, Slider, SmoothScrollArea, SpinBox, 
+    StrongBodyLabel, SubtitleLabel, SwitchButton, setTheme, TableWidget, Theme, TimeEdit, ToolButton, 
+    ToolTipFilter, ToolTipPosition, TransparentDropDownToolButton, TransparentToolButton
 )
 from qfluentwidgets.common import themeColor
 from qfluentwidgets.components.widgets import ListItemDelegate
 
-from basic_dirs import THEME_HOME
 import conf
+import file
 import list_ as list_
 import tip_toast
 import utils
-from utils import time_manager, TimeManagerFactory
-import weather
 import weather as wd
+from basic_dirs import THEME_HOME
 from conf import base_directory, load_theme_config
 from cses_mgr import CSES_Converter
-from generate_speech import get_tts_voices
-import generate_speech
+from generate_speech import ( 
+    get_voice_name_by_id_sync, get_tts_service, get_tts_service, generate_speech_sync, 
+    get_available_engines, get_supported_languages, TTSEngine
+)
 from file import config_center, schedule_center
-import file
-from network_thread import VersionThread, scheduleThread
+from network_thread import VersionThread, proxies, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
+import i18n_manager
+from utils import TimeManagerFactory
 
-from PyQt5.QtCore import QCoreApplication
-from qfluentwidgets import FluentTranslator
-from PyQt5.QtCore import QLocale
 
 class I18nManager:
     """i18n"""
@@ -68,7 +80,6 @@ class I18nManager:
         
     def scan_available_languages(self):
         try:
-            from pathlib import Path
             main_i18n_dir = Path(conf.base_directory) / 'i18n'
             if main_i18n_dir.exists():
                 for ts_file in main_i18n_dir.glob('*.ts'):
@@ -144,7 +155,6 @@ class I18nManager:
         """加载界面语言文件"""
         current_lang = self.current_language_view
         try:
-            from pathlib import Path
             app = QApplication.instance()
             if not app:
                 return False
@@ -267,12 +277,6 @@ class I18nManager:
             logger.error(f"从配置初始化语言时出错: {e}")
             self.load_language_view('zh_CN')
 
-
-# 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
 from PyQt5.QtCore import QCoreApplication
 
@@ -429,39 +433,73 @@ def cd_load_item():
 
 
 class selectCity(MessageBoxBase):  # 选择城市
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, method='location_key'):
         super().__init__(parent)
         title_label = SubtitleLabel()
         subtitle_label = BodyLabel()
-        self.search_edit = SearchLineEdit()
+        self.method = method
 
-        title_label.setText(QCoreApplication.translate('menu','搜索城市'))
-        subtitle_label.setText(QCoreApplication.translate('menu','请输入当地城市名进行搜索'))
-        self.yesButton.setText(QCoreApplication.translate('menu','选择此城市'))  # 按钮组件汉化
-        self.cancelButton.setText(QCoreApplication.translate('menu','取消'))
+        if method == 'location_key':
+            self.search_edit = SearchLineEdit()
+            title_label.setText(QCoreApplication.translate('menu','搜索城市'))
+            subtitle_label.setText(QCoreApplication.translate('menu','请输入当地城市名进行搜索'))
+            self.yesButton.setText(QCoreApplication.translate('menu','选择此城市'))
+            self.cancelButton.setText(QCoreApplication.translate('menu','取消'))
+            self.search_edit.setPlaceholderText(QCoreApplication.translate('menu','输入城市名'))
+            self.search_edit.setClearButtonEnabled(True)
+            self.search_edit.textChanged.connect(self.search_city)
+            self.city_list = ListWidget()
+            self.city_list.addItems(wd.search_by_name(''))
+            self.get_selected_city()
+            self.viewLayout.addWidget(title_label)
+            self.viewLayout.addWidget(subtitle_label)
+            self.viewLayout.addWidget(self.search_edit)
+            self.viewLayout.addWidget(self.city_list)
+            self.widget.setMinimumWidth(500)
+            self.widget.setMinimumHeight(600)
+        else:
+            title_label.setText(QCoreApplication.translate('menu','手动输入经纬度'))
+            subtitle_label.setText(QCoreApplication.translate('menu','请输入当地的经度和纬度'))
+            self.yesButton.setText(QCoreApplication.translate('menu','确定'))
+            self.cancelButton.setText(QCoreApplication.translate('menu','取消'))
 
-        self.search_edit.setPlaceholderText(QCoreApplication.translate('menu','输入城市名'))
-        self.search_edit.setClearButtonEnabled(True)
-        self.search_edit.textChanged.connect(self.search_city)
+            longitude_label = QLabel(QCoreApplication.translate('menu','经度'))
+            latitude_label = QLabel(QCoreApplication.translate('menu','纬度'))
+            self.longitude_edit = LineEdit()
+            self.latitude_edit = LineEdit()
+            self.longitude_edit.setPlaceholderText(QCoreApplication.translate('menu','经度，例如 116.40'))
+            self.latitude_edit.setPlaceholderText(QCoreApplication.translate('menu','纬度，例如 39.90'))
+            self._populate_coordinates_from_config()
 
-        self.city_list = ListWidget()
-        self.city_list.addItems(wd.search_by_name(''))
-        self.get_selected_city()
+            # 新增按钮
+            self.btn_internet = PushButton(QCoreApplication.translate('menu', '通过互联网获取经纬度'))
+            self.btn_internet.clicked.connect(self.get_coordinates_from_internet)
+            # if platform.system() in ['Windows', 'Darwin']:
+            #     btn_sysapi = PushButton(QCoreApplication.translate('menu', '通过系统获取经纬度'))
+            #     btn_sysapi.clicked.connect(self.get_coordinates_from_system)
 
-        # 将组件添加到布局中
-        self.viewLayout.addWidget(title_label)
-        self.viewLayout.addWidget(subtitle_label)
-        self.viewLayout.addWidget(self.search_edit)
-        self.viewLayout.addWidget(self.city_list)
-        self.widget.setMinimumWidth(500)
-        self.widget.setMinimumHeight(600)
+            self.viewLayout.addWidget(title_label)
+            self.viewLayout.addWidget(subtitle_label)
+            self.viewLayout.addWidget(longitude_label)
+            self.viewLayout.addWidget(self.longitude_edit)
+            self.viewLayout.addWidget(latitude_label)
+            self.viewLayout.addWidget(self.latitude_edit)
+            self.viewLayout.addWidget(self.btn_internet)
+            # if platform.system() in ['Windows', 'Darwin']:
+            #     self.viewLayout.addWidget(btn_sysapi)
+            self.widget.setMinimumWidth(400)
+            self.widget.setMinimumHeight(250)
 
     def search_city(self):
+        if self.method != 'location_key':
+            raise ValueError("Method must be 'location_key' for city search.")
         self.city_list.clear()
         self.city_list.addItems(wd.search_by_name(self.search_edit.text()))
         self.city_list.clearSelection()  # 清除选中项
 
     def get_selected_city(self):
+        if self.method != 'location_key':
+            raise ValueError("Method must be 'location_key' for city search.")
         selected_city = self.city_list.findItems(
             wd.search_by_num(str(config_center.read_conf('Weather', 'city'))), QtCore.Qt.MatchFlag.MatchExactly
         )
@@ -471,6 +509,172 @@ class selectCity(MessageBoxBase):  # 选择城市
             self.city_list.setCurrentItem(item)
             # 聚焦该项
             self.city_list.scrollToItem(item)
+
+    def _lock_input(self):
+        """锁定输入框"""
+        self.longitude_edit.setReadOnly(True)
+        self.latitude_edit.setReadOnly(True)
+        self.btn_internet.setEnabled(False)
+
+    def _unlock_input(self):
+        """解锁输入框"""
+        self.longitude_edit.setReadOnly(False)
+        self.latitude_edit.setReadOnly(False)
+        self.btn_internet.setEnabled(True)
+
+    def _catch_error(self, error_message: str):
+        """处理错误"""
+        self._unlock_input()
+        Flyout.create(
+            icon=InfoBarIcon.ERROR,
+            title=self.tr("经纬度获取失败"),
+            content=f"{error_message}",
+            target=self.btn_internet,
+            parent=self,
+            isClosable=True,
+            aniType=FlyoutAnimationType.PULL_UP,  
+        )
+        logger.error(f"获取经纬度失败: {error_message}")
+
+    class getCoordinatesInternet(QThread):
+        corrdinates = pyqtSignal(float, float)
+        error = pyqtSignal(str)
+
+        def __init__(self, url: str = 'http://ip-api.com/json/?fields=status,lat,lon'):
+            super().__init__()
+            self.download_url = url
+        
+        def run(self) -> None:
+            try:
+                coordinates_data = self.get_coordinates()
+                if coordinates_data:
+                    self.corrdinates.emit(coordinates_data[0], coordinates_data[1])
+
+            except Exception as e:
+                logger.error(f"获取坐标失败: {e}")
+                self.error.emit(str(e))
+
+        def get_coordinates(self) -> Tuple[float, float]:
+            import requests
+            try:
+                req = requests.get(self.download_url, proxies=proxies)
+                if req.status_code == 200:
+                    data = req.json()
+                    if data['status'] == 'success':
+                        logger.info(f"获取坐标成功：{data['lat']}, {data['lon']}")
+                        return (data['lat'], data['lon'])
+                    else:
+                        logger.error(f"获取坐标失败：{data['message']}")
+                        raise ValueError(f"获取坐标失败：{data['message']}")
+                else:
+                    logger.error(f"获取坐标失败：{req.status_code}")
+                    raise ValueError(f"获取坐标失败：{req.status_code}")
+            except Exception as e:
+                logger.error(f"获取坐标失败：{e}")
+                raise ValueError(f"获取坐标失败：{e}")
+
+    def get_coordinates_from_internet(self):
+        """通过网络获取经纬度"""
+        self._lock_input()
+        self.coordinates_thread = self.getCoordinatesInternet()
+        self.coordinates_thread.corrdinates.connect(self.set_coordinates)
+        self.coordinates_thread.error.connect(self._catch_error)
+        self.coordinates_thread.start()
+
+    def set_coordinates(self, latitude, longitude):
+        """设置经纬度到输入框"""
+        self._unlock_input()
+        self.latitude_edit.setText(str(latitude))
+        self.longitude_edit.setText(str(longitude))
+
+    def _populate_coordinates_from_config(self):
+        """从配置文件中读取经纬度信息并填充到输入框"""
+        try:
+            city_config = config_center.read_conf('Weather', 'city')
+            if city_config and ',' in city_config:
+                coords = city_config.split(',')
+                if len(coords) == 2:
+                    try:
+                        longitude = float(coords[0].strip())
+                        latitude = float(coords[1].strip())
+                        self.longitude_edit.setText(str(longitude))
+                        self.latitude_edit.setText(str(latitude))
+                    except ValueError:
+                        logger.debug("配置文件中的城市信息不是有效的经纬度格式")
+        except Exception as e:
+            logger.error(f"从配置文件读取经纬度信息失败: {e}")
+
+    # class getCoordinatesSystem(QThread):
+    #     location_ready = pyqtSignal(float, float)
+
+    #     def run(self):
+    #         if platform.system() == 'Windows':
+    #             loop = asyncio.new_event_loop()
+    #             asyncio.set_event_loop(loop)
+
+    #             try:
+    #                 result = loop.run_until_complete(self.get_location_windows())
+    #                 self.location_ready.emit(*result)
+    #             except Exception as e:
+    #                 logger.error(f"获取位置失败: {e}")
+    #             finally:
+    #                 loop.close()
+    #         elif platform.system() == 'Darwin':
+    #             self.get_location_macos()
+
+
+    #     async def get_location_windows(self):
+    #         if platform.system() != 'Windows':
+    #             raise ValueError("This method is only for Windows.")
+    #         from winrt.windows.devices.geolocation import Geolocator
+    #         geolocator = Geolocator()
+    #         pos = await geolocator.get_geoposition_async()
+    #         coord = pos.coordinate.point.position
+    #         return coord.latitude, coord.longitude
+
+    #     def get_location_macos(self):
+    #         if platform.system() != 'Darwin':
+    #             raise ValueError("This method is only for macOS.")
+    #         try:
+    #             from Cocoa import NSObject, NSRunLoop, NSDefaultRunLoopMode
+    #             from CoreLocation import CLLocationManager, kCLLocationAccuracyBest
+    #             import time
+    #             class LocationDelegate(NSObject):
+    #                 def init(self):
+    #                     self = super(LocationDelegate, self).init()
+    #                     if self:
+    #                         self.location = None
+    #                     return self
+
+    #                 def locationManager_didUpdateLocations_(self, manager, locations):
+    #                     self.location = locations[-1]
+    #                     manager.stopUpdatingLocation()
+
+    #             delegate = LocationDelegate.alloc().init()
+    #             manager = CLLocationManager.alloc().init()
+    #             manager.setDelegate_(delegate)
+    #             manager.setDesiredAccuracy_(kCLLocationAccuracyBest)
+    #             manager.requestWhenInUseAuthorization()
+    #             manager.startUpdatingLocation()
+
+    #             timeout = time.time() + 10  # 最多等待10秒
+    #             while not delegate.location and time.time() < timeout:
+    #                 NSRunLoop.currentRunLoop().runMode_beforeDate_(
+    #                     NSDefaultRunLoopMode, time.time() + 0.1
+    #                 )
+
+    #             if delegate.location:
+    #                 coord = delegate.location.coordinate()
+    #                 return coord.latitude(), coord.longitude()
+
+    #         except Exception as e:
+    #             self.location_error.emit(str(e))
+    
+    # def get_coordinates_from_system(self):
+    #     """通过系统获取经纬度"""
+    #     self.coordinates_thread = self.getCoordinatesSystem()
+    #     self.coordinates_thread.location_ready.connect(self.set_coordinates)
+    #     self.coordinates_thread.start()
 
 
 class licenseDialog(MessageBoxBase):  # 显示软件许可协议
@@ -769,7 +973,6 @@ class TTSVoiceLoaderThread(QThread):
         self.language_filter = language_filter
 
     def run(self):
-        loop = None
         try:
             if self.isInterruptionRequested():
                 return
@@ -777,39 +980,42 @@ class TTSVoiceLoaderThread(QThread):
                 logger.warning("当前系统不是Windows,跳过pyttsx3语音加载")
                 self.voicesLoaded.emit([])
                 return
-            
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
             try:
-                available_voices, error_message = loop.run_until_complete(
-                    get_tts_voices(engine_filter=self.engine_filter, language_filter=self.language_filter)
-                )
-            except Exception as e:
-                if loop and not loop.is_closed():
-                    loop.close()
-                raise e
+                manager = get_tts_service()._manager
+                engine_enum = None
+                if self.engine_filter:
+                    try:
+                        engine_enum = TTSEngine(self.engine_filter)
+                    except ValueError:
+                        error_msg = f"未知的TTS引擎: {self.engine_filter}"
+                        logger.error(error_msg)
+                        self.errorOccurred.emit(error_msg)
+                        return
                 
-            if self.isInterruptionRequested():
-                return
+                if self.isInterruptionRequested():
+                    return
+                voices = manager.get_voices(engine_enum, self.language_filter)
+                if self.isInterruptionRequested():
+                    return
+                # 转换格式
+                voice_list = []
+                for voice in voices:
+                    voice_list.append({
+                        'id': voice.id,
+                        'name': voice.name,
+                        'language': voice.language,
+                        'gender': voice.gender,
+                        'engine': voice.engine.value
+                    })
+                self.voicesLoaded.emit(voice_list)
 
-            if error_message:
-                self.errorOccurred.emit(error_message)
-            else:
-                self.voicesLoaded.emit(available_voices)
+            except Exception as e:
+                error_msg = f"获取TTS语音列表失败: {e!s}"
+                logger.error(error_msg)
+                self.errorOccurred.emit(error_msg)
         except Exception as e:
             logger.error(f"加载TTS语音列表时出错: {e}")
             self.errorOccurred.emit(str(e))
-        finally:
-            if loop and not loop.is_closed():
-                try:
-                    loop.close()
-                except Exception as e:
-                    logger.warning(f"关闭事件循环时出错: {e}")
-            try:
-                asyncio.set_event_loop(None)
-            except Exception as e:
-                logger.warning(f"清理事件循环引用时出错: {e}")
 
 
 class TTSPreviewThread(QThread):
@@ -832,10 +1038,8 @@ class TTSPreviewThread(QThread):
                 logger.info("TTS预览线程收到中断请求，正在退出...")
                 return
                 
-            from generate_speech import generate_speech_sync, TTSEngine
             from play_audio import play_audio
-            import os
-            
+
             logger.info(f"使用引擎 {self.engine} 生成预览语音")
             audio_file = generate_speech_sync(
                 text=self.text,
@@ -855,7 +1059,7 @@ class TTSPreviewThread(QThread):
                 logger.warning(f"生成的音频文件可能无效，大小仅为 {file_size} 字节: {audio_file}")
                 TTSEngine.delete_audio_file(audio_file)
                 raise ValueError(f"生成的音频文件可能无效，大小仅为 {file_size} 字节")
-                
+
             play_audio(audio_file, tts_delete_after=True)
             self.previewFinished.emit(True)
         except Exception as e:
@@ -866,8 +1070,9 @@ class TTSPreviewThread(QThread):
 class SettingsMenu(FluentWindow):
     closed = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, main_window=None):
         super().__init__()
+        self.main_window = main_window  # 主窗口引用，用于双向数据同步
         self.tts_voice_loader_thread = None
         self.button_clear_log = None
         self.version_thread = None
@@ -897,6 +1102,8 @@ class SettingsMenu(FluentWindow):
         self.hdInterface.setObjectName("hdInterface")
         self.plInterface = uic.loadUi(f'{base_directory}/view/menu/plugin_mgr.ui')  # 插件
         self.plInterface.setObjectName("plInterface")
+        self.wtInterface = uic.loadUi(f'{base_directory}/view/menu/weather.ui')  # 天气
+        self.wtInterface.setObjectName("wtInterface")
         self.version_number_label = self.ifInterface.findChild(QLabel, 'version_number_label')
         self.build_commit_label = self.ifInterface.findChild(QLabel, 'build_commit_label')
         self.build_uuid_label = self.ifInterface.findChild(QLabel, 'build_uuid_label')
@@ -908,7 +1115,7 @@ class SettingsMenu(FluentWindow):
             self.i18n_manager = global_i18n_manager
             logger.debug(f"复用i18n旧例,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
         else:
-            self.i18n_manager = I18nManager()
+            self.i18n_manager = i18n_manager.I18nManager()
             self.i18n_manager.init_from_config()
             logger.debug(f"创建新i18n管理,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
 
@@ -932,6 +1139,7 @@ class SettingsMenu(FluentWindow):
         self.setup_help_interface()
         self.setup_plugin_mgr_interface()
         self.setup_countdown_edit()
+        self.setup_weather_interface()
 
     # 初始化界面
     def setup_plugin_mgr_interface(self):
@@ -991,6 +1199,581 @@ class SettingsMenu(FluentWindow):
 
         self.load_plugin_cards()
         self.update_plugin_count()
+
+    def setup_weather_interface(self) -> None:
+        """初始化天气ui"""
+        try:
+            self.city_location_label = self.wtInterface.findChild(SubtitleLabel, 'teto_x')  # 城市位置标签
+            self.weather_update_time = self.wtInterface.findChild(CaptionLabel, 'weather_re_time')  # 更新时间
+            self.current_temperature = self.wtInterface.findChild(DisplayLabel, 'current_temperature_4')  # 当前温度
+            self.weather_description = self.wtInterface.findChild(SubtitleLabel, 'SubtitleLabel_3')  # 天气描述
+            self.feels_like_temperature = self.wtInterface.findChild(CaptionLabel, 'current_feels_like_2')  # 体感温度
+            self.weather_icon_label = self.wtInterface.findChild(QLabel, 'label_2')  # 天气图标
+            self.wind_speed_value = self.wtInterface.findChild(StrongBodyLabel, 'wind_value')  # 风速值
+            self.humidity_percentage_value = self.wtInterface.findChild(StrongBodyLabel, 'humidity_value')  # 湿度值
+            self.visibility_distance_value = self.wtInterface.findChild(StrongBodyLabel, 'visibility_value')  # 能见度值
+            self.pressure_hpa_value = self.wtInterface.findChild(StrongBodyLabel, 'pressure_value_2')  # 气压值
+            self.refresh_button = self.wtInterface.findChild(ToolButton, 'ToolButton') # 刷新按钮
+            select_weather_api = self.wtInterface.findChild(ComboBox, 'select_weather_api') # 天气api选择器
+            api_key_edit = self.wtInterface.findChild(LineEdit, 'api_key_edit') # api_key输入框
+            self.api_key_card = self.wtInterface.findChild(QWidget, 'CardWidget_5') # api_key卡片容器
+            self.alerts_title_label = self.wtInterface.findChild(SubtitleLabel, 'alerts_title_label')  # 预警标题
+            self.weather_alerts_section = self.wtInterface.findChild(QVBoxLayout, 'weather_alerts_section')  # 预警区域
+            alerts_container_widget = self.wtInterface.findChild(QWidget, 'alerts_container_widget')  # 预警容器widget
+            self.weather_temperat_unit = self.wtInterface.findChild(ComboBox, 'weather_temperat_unit')  # 温度单位选择器
+            self.weather_refresh_picker = self.wtInterface.findChild(SpinBox, 'weather_refresh_picker')  # 刷新时间选择器
+            alert_exclude = self.wtInterface.findChild(LineEdit, 'alert_exclude')
+
+            if self.refresh_button:
+                self.refresh_button.setIcon(fIcon.SYNC)
+                self.refresh_button.clicked.connect(self._on_refresh_clicked)
+            if self.weather_refresh_picker:
+                self.weather_refresh_picker.setRange(5, 120)  # 5分钟到120分钟
+                refresh_interval = int(config_center.read_conf('Weather', 'refresh_interval'))
+                self.weather_refresh_picker.setValue(refresh_interval)  # 从配置读取
+                self.weather_refresh_picker.setSuffix(' 分钟')
+                self.weather_refresh_picker.valueChanged.connect(self._on_refresh_interval_changed)
+            if self.weather_temperat_unit:
+                self.weather_temperat_unit.addItems(list_.temperature_units)
+                current_unit = config_center.read_conf('Weather', 'temperature_unit')
+                if current_unit == 'fahrenheit':
+                    self.weather_temperat_unit.setCurrentIndex(1)  # 华氏度
+                else:
+                    self.weather_temperat_unit.setCurrentIndex(0)  # 摄氏度
+                self.weather_temperat_unit.currentIndexChanged.connect(self._on_temperature_unit_changed)
+            if alerts_container_widget:
+                self.alerts_container_layout = FlowLayout(alerts_container_widget, needAni=True)
+                self.alerts_container_layout.setContentsMargins(10, 10, 10, 10)
+                self.alerts_container_layout.setVerticalSpacing(8)
+                self.alerts_container_layout.setHorizontalSpacing(8)
+                # logger.debug(f"FlowLayout创建成功: {self.alerts_container_layout}")
+            else:
+                self.alerts_container_layout = None
+            self.alert_cards: list[QWidget] = []  # 预警卡片列表
+            if select_weather_api:
+                select_weather_api.addItems(wd.weather_manager.api_config['weather_api_list_zhCN'])
+                select_weather_api.setCurrentIndex(wd.weather_manager.api_config['weather_api_list'].index(
+                    config_center.read_conf('Weather', 'api')
+                ))
+                select_weather_api.currentIndexChanged.connect(
+                    lambda: self._on_weather_api_changed(select_weather_api)
+                )
+            if api_key_edit:
+                api_key_edit.setText(config_center.read_conf('Weather', 'api_key', ''))
+                api_key_edit.textChanged.connect(lambda: config_center.write_conf('Weather', 'api_key', api_key_edit.text()))
+            if alert_exclude:
+                alert_exclude.setText(config_center.read_conf('Weather', 'alert_exclude', ''))
+                alert_exclude.setPlaceholderText(self.tr('大风 雷电 地质...'))
+            alert_exclude.textChanged.connect(lambda: config_center.write_conf('Weather', 'alert_exclude', alert_exclude.text()))
+
+            # 初始化天气管理器
+            self.weather_manager = wd.WeatherManager()
+            self.weather_fetch_thread = wd.WeatherFetchThread(self.weather_manager)
+            self.weather_fetch_thread.weather_data_ready.connect(self._on_weather_data_ready)
+            self.weather_fetch_thread.weather_error.connect(self._on_weather_error)
+            self.weather_fetch_thread.start()
+            self._update_api_key_card_visibility()
+            self._is_refreshing = False  # 刷新标志
+        except Exception as e:
+            logger.error(f"天气界面初始化失败: {e}")
+
+    def _update_api_key_card_visibility(self) -> None:
+        """APIkey卡片显示状态"""
+        try:
+            if hasattr(self, 'api_key_card') and self.api_key_card:
+                current_api = config_center.read_conf('Weather', 'api')
+                # 检查当前API是否需要key (qweather, amap_weather, qq_weather)
+                needs_api_key = current_api in ['qweather', 'amap_weather', 'qq_weather']
+                self.api_key_card.setVisible(needs_api_key)
+        except Exception as e:
+            logger.error(f"更新API key卡片显示状态失败: {e}")
+
+    def _on_refresh_clicked(self) -> None:
+        """刷新按钮"""
+        try:
+            if hasattr(self, '_is_refreshing') and self._is_refreshing:
+                return
+            self._is_refreshing = True
+            if hasattr(self, 'refresh_animation'):
+                self.refresh_animation.start()
+            if hasattr(self, 'weather_fetch_thread') and self.weather_fetch_thread.isRunning():
+                self.weather_fetch_thread.stop()
+                self.weather_fetch_thread.wait()
+            self.weather_fetch_thread = wd.WeatherFetchThread(self.weather_manager)
+            self.weather_fetch_thread.weather_data_ready.connect(self._on_weather_data_ready)
+            self.weather_fetch_thread.weather_error.connect(self._on_weather_error)
+            self.weather_fetch_thread.finished.connect(lambda: setattr(self, '_is_refreshing', False))
+            self.weather_fetch_thread.start()
+            if hasattr(self, 'main_window') and self.main_window:
+                self.main_window.get_weather_data()
+        except Exception as e:
+            logger.error(f"刷新天气数据失败: {e}")
+            self._is_refreshing = False
+    
+    def _on_refresh_interval_changed(self, value: int) -> None:
+        """天气刷新间隔改变事件"""
+        try:
+            config_center.write_conf('Weather', 'refresh_interval', str(value))
+            if hasattr(self, 'main_window') and self.main_window:
+                self.main_window.update_weather_timer_interval(value)
+            # logger.info(f'天气刷新间隔已更新为 {value}')
+        except Exception as e:
+            logger.error(f'更新天气刷新间隔失败: {e}')
+    
+    def _on_temperature_unit_changed(self, index: int) -> None:
+        """温度单位改变事件"""
+        try:
+            if index == 1:
+                unit = 'fahrenheit'  # 华氏度
+            else:
+                unit = 'celsius'  # 摄氏度
+            config_center.write_conf('Weather', 'temperature_unit', unit)
+            self._on_refresh_clicked()
+            # logger.info(f'温度单位已更新为 {unit}')
+        except Exception as e:
+            logger.error(f'更新温度单位失败: {e}')
+
+    def _on_weather_data_ready(self, weather_data: dict) -> None:
+        """就绪回调"""
+        try:
+            self._update_weather_display_with_data(weather_data)
+        except Exception as e:
+            logger.error(f"处理异步天气数据失败: {e}")
+
+    def _on_weather_error(self, error_message: str) -> None:
+        """数据错误回调"""
+        try:
+            self._show_weather_error(error_message)
+            logger.warning(f"异步获取天气数据出错: {error_message}")
+        except Exception as e:
+            logger.error(f"处理天气错误失败: {e}")
+
+    def _update_weather_display_with_data(self, weather_data: dict) -> None:
+        """已获取数据更新"""
+        try:
+            weather_now = weather_data.get('now', {})
+            if 'error' in weather_now:
+                self._show_weather_error(weather_now['error'])
+                return
+            self._update_basic_weather_info(weather_now)
+            QApplication.processEvents()
+            self._update_weather_details(weather_now)
+            QApplication.processEvents()
+            self._update_weather_alerts(weather_data)
+            QApplication.processEvents()
+            # self._update_weather_forecasts(weather_now)
+        except Exception as e:
+            logger.error(f"同步更新天气显示失败: {e}")
+            self._show_weather_error("显示更新失败")
+    
+    def _update_basic_weather_info(self, weather_data):
+        """基本天气信息"""
+        try:
+            city_code = config_center.read_conf('Weather', 'city', '0')
+            if city_code == '0':
+                city_name = '未知城市'
+            else:
+                city_name = wd.weather_database.search_city_by_code(city_code)
+                if city_name == 'coordinates' and ',' in city_code:
+                    try:
+                        lon, lat = city_code.split(',')
+                        city_name = f"{abs(float(lat)):.2f}°{'N' if float(lat) >= 0 else 'S'}, {abs(float(lon)):.2f}°{'E' if float(lon) >= 0 else 'W'}"
+                    except (ValueError, IndexError):
+                        city_name = ''
+            if self.city_location_label:
+                if city_name:
+                    self.city_location_label.setText(f"{city_name} · 当前天气")
+                else:
+                    self.city_location_label.setText("当前天气")
+            update_time_str = wd.get_weather_data('updateTime', weather_data)
+            if update_time_str:
+                try:
+                    if 'T' in update_time_str:
+                        time_part = update_time_str.split('T')[1]
+                        if '+' in time_part:
+                            time_part = time_part.split('+')[0]
+                        elif 'Z' in time_part:
+                            time_part = time_part.replace('Z', '')
+                        display_time = time_part[:5]  # 取HH:MM部分
+                        date_part = update_time_str.split('T')[0]
+                        # 转换为 MM/DD/YYYY 格式
+                        try:
+                            year, month, day = date_part.split('-')
+                            formatted_date = f"{month}/{day}/{year}"
+                            display_datetime = f"{formatted_date} {display_time}"
+                        except:
+                            display_datetime = f"{date_part} {display_time}"
+                    else:
+                        display_datetime = datetime.datetime.now().strftime("%m/%d/%Y %H:%M")
+                except Exception as e:
+                    logger.warning(f"解析更新时间失败: {e}, 使用当前时间")
+                    display_datetime = datetime.datetime.now().strftime("%m/%d/%Y %H:%M")
+            else:
+                display_datetime = datetime.datetime.now().strftime("%m/%d/%Y %H:%M")
+            
+            if self.weather_update_time:
+                self.weather_update_time.setText(f"最后更新于 {display_datetime}")
+            temp_data = wd.get_weather_data('temp', weather_data)
+            if self.current_temperature and temp_data and temp_data.lower() != 'none':
+                self.current_temperature.setText(temp_data)
+            elif self.current_temperature:
+                self.current_temperature.setText('--°')
+            icon_code = wd.get_weather_data('icon', weather_data)
+            if icon_code:
+                description = wd.get_weather_by_code(icon_code)
+                if self.weather_description and description:
+                    self.weather_description.setText(description)
+            feels_like_data = wd.get_weather_data('feels_like', weather_data)
+            if self.feels_like_temperature and feels_like_data and feels_like_data.lower() != 'none':
+                self.feels_like_temperature.setText(f"体感温度: {feels_like_data}")
+            elif self.feels_like_temperature:
+                self.feels_like_temperature.setText("体感温度: --°")
+            if self.weather_icon_label and icon_code:
+                icon_data = wd.get_weather_icon_by_code(icon_code)
+                self._update_weather_icon(icon_data)
+        except Exception as e:
+            logger.error(f"更新基本天气信息失败: {e}")
+
+    def _update_weather_icon(self, icon_data):
+        """更新天气图标"""
+        try:
+            icon_path = os.path.join(base_directory, 'img', 'weather', f'{icon_data}')
+            if os.path.exists(icon_path):
+                self._render_svg_icon(icon_path)
+            else:
+                # 未知图标
+                default_icon = os.path.join(base_directory, 'img', 'weather', '99.svg')
+                if os.path.exists(default_icon):
+                    self._render_svg_icon(default_icon)
+        except Exception as e:
+            logger.error(f"更新天气图标失败: {e}")
+
+    def _render_svg_icon(self, svg_path):
+        """渲染SVG"""
+        try:
+            renderer = QSvgRenderer(svg_path)
+            if not renderer.isValid():
+                raise ValueError(f"无效的SVG文件: {svg_path}")
+            svg_size = renderer.defaultSize()
+            if svg_size.isEmpty():
+                svg_size = QSize(100, 100)  # 默认尺寸
+            target_size = 100
+            aspect_ratio = svg_size.width() / svg_size.height()
+            if aspect_ratio > 1:
+                final_width = target_size
+                final_height = int(target_size / aspect_ratio)
+            else:
+                final_height = target_size
+                final_width = int(target_size * aspect_ratio)
+            final_size = QSize(final_width, final_height)
+            high_res_size = final_size * 2
+            pixmap = QPixmap(high_res_size)
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            painter.setRenderHint(QPainter.TextAntialiasing, True)
+            renderer.render(painter)
+            painter.end()
+            scaled_pixmap = pixmap.scaled(final_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            if hasattr(self, 'weather_icon_label') and self.weather_icon_label:
+                self.weather_icon_label.setPixmap(scaled_pixmap)
+                self.weather_icon_label.setScaledContents(False)
+                self.weather_icon_label.setAlignment(Qt.AlignCenter)
+        except Exception as e:
+            logger.error(f"SVG图标渲染失败: {e}")
+            try:
+                default_icon = os.path.join(base_directory, 'img', 'weather', '99.svg')
+                if os.path.exists(default_icon) and svg_path != default_icon:
+                    self._render_svg_icon(default_icon)
+            except:
+                pass
+
+    def _update_weather_details(self, weather_data):
+        """其他天气信息"""
+        try:
+            # 风速和风向
+            wind_speed = wd.get_weather_data('wind_speed', weather_data)
+            wind_direction = wd.get_weather_data('wind_direction', weather_data)
+            if self.wind_speed_value:
+                wind_text = ""
+                if wind_speed and wind_speed.lower() != 'none':
+                    wind_text = f"{wind_speed}"
+                    if wind_direction and wind_direction.lower() != 'none':
+                        wind_text += f" {wind_direction}"
+                else:
+                    wind_text = "-- km/h"
+                self.wind_speed_value.setText(wind_text)
+            # 湿度
+            humidity = wd.get_weather_data('humidity', weather_data)
+            if self.humidity_percentage_value and humidity and humidity.lower() != 'none':
+                self.humidity_percentage_value.setText(f"{humidity}")
+            elif self.humidity_percentage_value:
+                self.humidity_percentage_value.setText("-- %")
+            # 能见度
+            visibility = wd.get_weather_data('visibility', weather_data)
+            if self.visibility_distance_value and visibility and visibility.lower() != 'none':
+                self.visibility_distance_value.setText(f"{visibility}")
+            elif self.visibility_distance_value:
+                self.visibility_distance_value.setText("-- km")
+            # 气压
+            pressure = wd.get_weather_data('pressure', weather_data)
+            if self.pressure_hpa_value and pressure and pressure.lower() != 'none':
+                self.pressure_hpa_value.setText(f"{pressure}")
+            elif self.pressure_hpa_value:
+                self.pressure_hpa_value.setText("-- hPa")
+            # aqi = wd.get_weather_data('aqi', weather_data)
+            # if aqi and aqi.lower() != 'none':
+            #     logger.info(f"空气质量指数(AQI): {aqi}")
+            # air_quality_params = ['co', 'no2', 'o3', 'pm10', 'pm25', 'so2']
+            # for param in air_quality_params:
+            #     value = wd.get_weather_data(param, weather_data)
+                # if value and value.lower() != 'none':
+                #     logger.info(f"{param.upper()}: {value}")
+        except Exception as e:
+            logger.error(f"更新天气详细信息失败: {e}")
+
+    def _update_weather_alerts(self, weather_data: dict) -> None:
+        """更新天气预警信息"""
+        try:
+            alerts_info = wd.get_unified_weather_alerts(weather_data)
+            if alerts_info.get('has_alert', False):
+                self._show_weather_alerts_section()
+                all_alerts = alerts_info.get('all_alerts', [])
+                self._update_alert_cards(all_alerts)
+                if hasattr(self, 'alerts_title_label') and self.alerts_title_label:
+                    alert_count = alerts_info.get('alert_count', 0)
+                    self.alerts_title_label.setText(f"天气预警 ({alert_count}条)")
+            else:
+                self._hide_weather_alerts_section()
+        except Exception as e:
+            logger.error(f"更新天气预警失败: {e}")
+            self._hide_weather_alerts_section()
+
+    def _hide_weather_alerts_section(self) -> None:
+        """隐藏预警区域"""
+        try:
+            if hasattr(self, 'weather_alerts_section') and self.weather_alerts_section:
+                for i in range(self.weather_alerts_section.count()):
+                    item = self.weather_alerts_section.itemAt(i)
+                    if item and item.widget():
+                        item.widget().hide()
+        except Exception as e:
+            logger.error(f"隐藏预警区域失败: {e}")
+
+    def _show_weather_alerts_section(self) -> None:
+        """显示预警区域"""
+        try:
+            if hasattr(self, 'weather_alerts_section') and self.weather_alerts_section:
+                for i in range(self.weather_alerts_section.count()):
+                    item = self.weather_alerts_section.itemAt(i)
+                    if item and item.widget():
+                        item.widget().show()
+        except Exception as e:
+            logger.error(f"显示预警区域失败: {e}")
+
+    def _update_alert_cards(self, alerts_data: list) -> None:
+        """更新预警卡片"""
+        try:
+            self._clear_alert_cards()
+            for alert in alerts_data:
+                self._create_alert_card(alert)
+            if hasattr(self, 'alerts_container_layout') and self.alerts_container_layout:
+                self.alerts_container_layout.update()
+        except Exception as e:
+            logger.error(f"更新预警卡片失败: {e}")
+
+    def _clear_alert_cards(self) -> None:
+        """清除现有的预警卡片"""
+        try:
+            if hasattr(self, 'alert_cards') and hasattr(self, 'alerts_container_layout'):
+                if self.alerts_container_layout:
+                    self.alerts_container_layout.removeAllWidgets()
+                for card in self.alert_cards:
+                    if card:
+                        card.setParent(None)
+                        card.deleteLater()
+                self.alert_cards.clear()
+        except Exception as e:
+            logger.error(f"清除预警卡片失败: {e}")
+
+    def _create_alert_card(self, alert_data: dict) -> None:
+        """创建单个预警卡片"""
+        try:
+            ui_file_path = os.path.join(os.path.dirname(__file__), 'view', 'menu', 'weather_alert_card.ui')
+            card_widget = uic.loadUi(ui_file_path)
+            alert_icon = card_widget.findChild(QLabel, 'alert_icon')  # 预警强度图片
+            alerts_label = card_widget.findChild(StrongBodyLabel, 'alerts_label')  # 预警类型
+            if alert_icon:
+                icon_path = wd.get_alert_icon_by_severity(alert_data.get('severity', 'unknown'))
+                if icon_path and os.path.exists(icon_path):
+                    pixmap = QPixmap(icon_path)
+                    if not pixmap.isNull():
+                        scaled_pixmap = pixmap.scaled(75, 75, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        alert_icon.setPixmap(scaled_pixmap)
+            if alerts_label:
+                alert_text = wd.simplify_alert_text(alert_data.get('type', self.tr('未知')))
+                full_text = alert_text + self.tr('预警')
+                alerts_label.setText(full_text)
+                text_length = len(full_text)
+                if text_length <= 4:
+                    font_size = 17  # 默认字体大小
+                elif text_length <= 6:
+                    font_size = 15
+                elif text_length <= 8:
+                    font_size = 13
+                else:
+                    font_size = 11
+                font = alerts_label.font()
+                font.setPointSize(font_size)
+                alerts_label.setFont(font)
+            card_widget.mousePressEvent = lambda event, data=alert_data: self._show_alert_detail(data)
+            card_widget.setCursor(Qt.PointingHandCursor)  # 悬停光标
+            # logger.debug(f"alerts_container_layout: hasattr={hasattr(self, 'alerts_container_layout')}, value={getattr(self, 'alerts_container_layout', None)}")
+            if hasattr(self, 'alerts_container_layout') and self.alerts_container_layout is not None:
+                # logger.debug(f"正在添加卡片: {alert_data.get('type', '未知预警')}")
+                self.alerts_container_layout.addWidget(card_widget)
+                self.alert_cards.append(card_widget)
+                card_widget.show()
+                self.alerts_container_layout.update()
+            else:
+                logger.error(f"布局不存在或为空: hasattr={hasattr(self, 'alerts_container_layout')}, value={getattr(self, 'alerts_container_layout', None)}")
+        except Exception as e:
+            logger.error(f"创建预警卡片失败: {e}")
+            # import traceback
+            # logger.error(f"详细错误信息: {traceback.format_exc()}")
+
+    def _show_alert_detail(self, alert_data: dict) -> None:
+        """预警详情msg_box"""
+        try:
+            ui_file_path = os.path.join(os.path.dirname(__file__), 'view', 'menu', 'weather_alert_msgbox.ui')
+            detail_widget = uic.loadUi(ui_file_path)
+            msgbox = MessageBoxBase(self)
+            msgbox.viewLayout.addWidget(detail_widget)
+            msgbox.viewLayout.setContentsMargins(0, 0, 0, 0)
+            alert_icon = detail_widget.findChild(QLabel, 'alertIcon')
+            if alert_icon:
+                icon_path = wd.get_alert_icon_by_severity(alert_data.get('severity', 'unknown'))
+                if icon_path and os.path.exists(icon_path):
+                    pixmap = QPixmap(icon_path)
+                    if not pixmap.isNull():
+                        scaled_pixmap = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        alert_icon.setPixmap(scaled_pixmap)
+            alert_title = detail_widget.findChild(QLabel, 'alertTitle')
+            if alert_title:
+                display_text = alert_data.get('display_text', '')
+                if not display_text:
+                    alert_text = wd.simplify_alert_text(alert_data.get('type', '未知'))
+                    severity_text = wd.get_severity_text(alert_data.get('severity', 'unknown'))
+                    display_text = f"{alert_text}{severity_text}预警"
+                alert_title.setText(display_text)
+            publish_time = detail_widget.findChild(QLabel, 'publishTime')
+            if publish_time:
+                time_str = (alert_data.get('start_time') or alert_data.get('pub_time') or self.tr('未知时间'))
+                if time_str and time_str != '未知时间':
+                    try:
+                        if 'T' in time_str:
+                            dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                            time_str = dt.strftime('%Y-%m-%d %H:%M')
+                    except:
+                        pass
+                publish_time.setText(time_str)
+            alert_description = detail_widget.findChild(QLabel, 'alertDescription')
+            if alert_description:
+                description = alert_data.get('description', self.tr('暂无详细描述'))
+                alert_description.setText(description)
+            msgbox.yesButton.setText(self.tr('确定'))
+            msgbox.cancelButton.setText(self.tr('不再显示该类型预警'))
+            msgbox.cancelButton.show()
+            def on_hide_alert():
+                self._add_to_alert_exclude(alert_data)
+                msgbox.reject()
+            msgbox.cancelButton.clicked.disconnect()
+            msgbox.cancelButton.clicked.connect(on_hide_alert)
+            msgbox.setWindowTitle(self.tr('天气预警详情'))
+            msgbox.widget.setFixedSize(620, 420)
+            msgbox.exec_()
+
+        except Exception as e:
+            logger.error(f"显示预警详情失败: {e}")
+            # import traceback
+            # logger.error(f"详细错误信息: {traceback.format_exc()}")
+    
+    def _add_to_alert_exclude(self, alert_data: dict) -> None:
+        """添加预警排除"""
+        try:
+            alert_title = alert_data.get('display_text', '')
+            if not alert_title:
+                alert_text = wd.simplify_alert_text(alert_data.get('type', '未知'))
+                severity_text = wd.get_severity_text(alert_data.get('severity', 'unknown'))
+                alert_title = f"{alert_text}{severity_text}预警"
+            current_exclude = config_center.read_conf('Weather', 'alert_exclude', '')
+            if current_exclude:
+                new_exclude = f"{current_exclude} {alert_title}"
+            else:
+                new_exclude = alert_title
+
+            config_center.write_conf('Weather', 'alert_exclude', new_exclude)
+            self._refresh_alert_exclude_ui()
+            self._on_refresh_clicked()
+        except Exception as e:
+            logger.error(f"添加预警到排除列表失败: {e}")
+
+    def _refresh_alert_exclude_ui(self) -> None:
+        try:
+            alert_exclude_widget = self.wtInterface.findChild(LineEdit, 'alert_exclude')
+            if alert_exclude_widget:
+                current_exclude = config_center.read_conf('Weather', 'alert_exclude', '')
+                alert_exclude_widget.setText(current_exclude)
+        except Exception as e:
+            logger.error(f"刷新alert_exclude失败: {e}")
+
+    def _show_weather_error(self, error_info: Union[str, dict]) -> None:
+        """显示天气错误信息"""
+        try:
+            if isinstance(error_info, str):
+                error_text = error_info
+            elif isinstance(error_info, dict):
+                info = error_info.get('info', {})
+                if isinstance(info, dict):
+                    value = info.get('value', '错误')
+                    unit = info.get('unit', '未知错误')
+                    error_text = f"{value}: {unit}"
+                else:
+                    error_text = str(error_info.get('message', '获取天气数据失败'))
+            else:
+                error_text = "获取天气数据失败" # 不存在但向后保底
+            if hasattr(self, 'current_temperature') and self.current_temperature:
+                self.current_temperature.setText("-- °C")
+            if hasattr(self, 'weather_description') and self.weather_description:
+                self.weather_description.setText(error_text)
+            if hasattr(self, 'city_location_label') and self.city_location_label:
+                self.city_location_label.setText("天气信息获取失败")
+            self._hide_weather_alerts_section()
+        except Exception as e:
+            logger.error(f"显示错误信息失败: {e}")
+
+    def _on_weather_api_changed(self, select_weather_api):
+        """API切换处理"""
+        try:
+            new_api = wd.weather_manager.api_config['weather_api_list'][select_weather_api.currentIndex()]
+            config_center.write_conf('Weather', 'api', new_api)
+            config_center.write_conf('Weather', 'city', '0')
+            self._hide_weather_alerts_section()
+            self._update_api_key_card_visibility()
+            Flyout.create(
+                icon=InfoBarIcon.INFORMATION,
+                title=self.tr('天气API已切换'),
+                content=self.tr('建议重新选择城市以获取准确的天气数据'),
+                target=select_weather_api,
+                parent=self.wtInterface,
+                isClosable=True
+            )
+            if hasattr(wd, 'on_weather_api_changed'):
+                wd.on_weather_api_changed(new_api)
+            self._on_refresh_clicked()
+        except Exception as e:
+            logger.error(f'切换天气API时发生错误: {e}')
 
     def load_plugin_cards(self):
         """加载插件卡片"""
@@ -1467,7 +2250,7 @@ class SettingsMenu(FluentWindow):
             from qfluentwidgets import MessageBox
             MessageBox(
                 self.tr("TTS生成失败"),
-                self.tr("生成或播放语音时出错: {error_message}").format(error_message),
+                self.tr("生成或播放语音时出错: {error_message}").format(error_message=error_message),
                 self
             ).exec()
 
@@ -1477,6 +2260,12 @@ class SettingsMenu(FluentWindow):
             self.TTSSettingsDialog = self.TTSSettings(self)
         current_selected_engine_in_selector = self.engine_selector.currentData()
         tts_enabled = config_center.read_conf('TTS', 'enable') == '1'
+
+        tts_dialog_widget = self.TTSSettingsDialog.widget if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else None
+        if tts_dialog_widget:
+            preview_tts_button = tts_dialog_widget.findChild(PrimaryDropDownPushButton, 'preview')
+            if preview_tts_button:
+                preview_tts_button.setEnabled(tts_enabled)
 
         if tts_enabled:
             self.voice_selector.clear()
@@ -1530,6 +2319,10 @@ class SettingsMenu(FluentWindow):
             self.voice_language_selector.setEnabled(False)
         if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog.isVisible():
             self.switch_enable_TTS.setEnabled(False) # 临时禁用TTS开关
+            tts_dialog_widget = self.TTSSettingsDialog.widget
+            preview_tts_button = tts_dialog_widget.findChild(PrimaryDropDownPushButton, 'preview')
+            if preview_tts_button:
+                preview_tts_button.setEnabled(False)
 
         if self.tts_voice_loader_thread and self.tts_voice_loader_thread.isRunning():
             self.tts_voice_loader_thread.requestInterruption()
@@ -1541,14 +2334,13 @@ class SettingsMenu(FluentWindow):
         self.current_loaded_engine = engine_key
         self.available_voices = None
         self.tts_voice_loader_thread = TTSVoiceLoaderThread(engine_filter=engine_key, language_filter=language_filter)
-        self.tts_voice_loader_thread.voicesLoaded.connect(lambda voices: self.available_voices_cnt(voices) or self.switch_enable_TTS.setEnabled(True) or self._enable_language_selector())
+        self.tts_voice_loader_thread.voicesLoaded.connect(lambda voices: self.available_voices_cnt(voices) or self.switch_enable_TTS.setEnabled(True) or self._enable_language_selector() or self._enable_preview_button())
         self.tts_voice_loader_thread.errorOccurred.connect(lambda error: self.handle_tts_load_error(error) or self.switch_enable_TTS.setEnabled(True) or self._enable_language_selector())
         self.tts_voice_loader_thread.start()
 
     def populate_tts_engines(self):
-        # 填充TTS引擎选项
         self.engine_selector.clear()
-        available_engines = generate_speech.get_available_engines() #  假设 generate_speech 有这个方法
+        available_engines = get_available_engines()
         logger.debug(f"可用TTS引擎: {available_engines}")
         for engine_key, engine_name in available_engines.items():
             if engine_key == 'pyttsx3' and platform.system() != "Windows":
@@ -1624,6 +2416,11 @@ class SettingsMenu(FluentWindow):
             return
         card_tts_speed = tts_dialog_widget.findChild(CardWidget, 'CardWidget_7')
         card_tts_speed.setVisible(checked)
+        
+        preview_tts_button = tts_dialog_widget.findChild(PrimaryDropDownPushButton, 'preview')
+        if preview_tts_button:
+            preview_tts_button.setEnabled(checked)
+        
         if checked:
             self.engine_selector.setEnabled(True)
             if self.voice_selector.itemText(0) in [self.tr("未启用"),self.tr("加载失败"),self.tr( "无可用语音")] or self.voice_selector.count() == 0:
@@ -1658,6 +2455,17 @@ class SettingsMenu(FluentWindow):
     def save_tts_speed(self, value):
         config_center.write_conf('TTS', 'speed', str(value))
 
+    def on_voice_changed(self, voice_text):
+        """语音选择器变化"""
+        if not hasattr(self, 'voice_selector') or not self.voice_selector:
+            return
+        if not self.voice_selector.isEnabled():
+            return
+        selected_voice_id = self.voice_selector.currentData()
+        if selected_voice_id:
+            config_center.write_conf('TTS', 'voice_id', selected_voice_id)
+            logger.debug(f"TTS语音已更改为: {voice_text} (ID: {selected_voice_id})")
+
     def update_tts_voices(self, available_voices):
         voice_selector = self.voice_selector
         switch_enable_TTS = self.switch_enable_TTS
@@ -1679,11 +2487,12 @@ class SettingsMenu(FluentWindow):
             switch_enable_TTS.setEnabled(True)
             card_tts_speed = self.findChild(CardWidget, 'CardWidget_7')
             if card_tts_speed: card_tts_speed.setVisible(False)
+            return  # 没有可用语音时直接返回，不需要重新连接信号
 
         for voice in available_voices:
             voice_selector.addItem(voice['name'], userData=voice['id'])
         current_voice_id = config_center.read_conf('TTS', 'voice_id')
-        from generate_speech import get_voice_name_by_id_sync
+        
         current_voice_name = get_voice_name_by_id_sync(current_voice_id, available_voices)
         if current_voice_name:
             index_to_select = -1
@@ -1711,25 +2520,21 @@ class SettingsMenu(FluentWindow):
              switch_enable_TTS.setEnabled(False)
 
         voice_selector.setEnabled(True)
+        try:
+            voice_selector.currentTextChanged.connect(self.on_voice_changed)
+        except Exception as e:
+            logger.warning(f"连接voice_selector信号失败: {e}")
         self._enable_language_selector()
 
     def setup_voice_language_selector(self):
         """设置语言选择器"""
         if not self.voice_language_selector:
             return
-        
-        # 导入语言支持函数
-        from generate_speech import get_supported_languages
-        
-        # 清空并添加语言选项
         self.voice_language_selector.clear()
         self.voice_language_selector.addItem("全部语言", userData=None)
-        
         supported_languages = get_supported_languages()
         for lang_code, lang_name in supported_languages.items():
             self.voice_language_selector.addItem(lang_name, userData=lang_code)
-        
-        # 加载保存的语言配置
         saved_language = config_center.read_conf('TTS', 'language')
         if saved_language:
             index = self.voice_language_selector.findData(saved_language)
@@ -1753,6 +2558,15 @@ class SettingsMenu(FluentWindow):
         """启用语言选择器"""
         if hasattr(self, 'voice_language_selector') and self.voice_language_selector:
             self.voice_language_selector.setEnabled(True)
+        return True
+    
+    def _enable_preview_button(self):
+        """启用预览按钮"""
+        if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog and self.TTSSettingsDialog.isVisible():
+            tts_dialog_widget = self.TTSSettingsDialog.widget
+            preview_tts_button = tts_dialog_widget.findChild(PrimaryDropDownPushButton, 'preview')
+            if preview_tts_button and config_center.read_conf('TTS', 'enable') == '1':
+                preview_tts_button.setEnabled(True)
         return True
     
     def on_voice_language_changed(self, language_text):
@@ -1989,8 +2803,9 @@ class SettingsMenu(FluentWindow):
         widgets_combo = self.findChild(ComboBox, 'widgets_combo')  # 组件选择
         widgets_combo.addItems(list_.get_widget_names())
 
-        search_city_button = self.findChild(PushButton, 'select_city')  # 查找城市
-        search_city_button.clicked.connect(self.show_search_city)
+        search_city_button = self.wtInterface.findChild(PushButton, 'select_city')
+        if search_city_button:
+            search_city_button.clicked.connect(self.show_search_city)
 
         add_widget_button = self.findChild(PrimaryPushButton, 'add_widget')
         add_widget_button.clicked.connect(self.ct_add_widget)
@@ -2018,21 +2833,6 @@ class SettingsMenu(FluentWindow):
         switch_enable_display_full_next_lessons.setChecked(int(config_center.read_conf('General', 'enable_display_full_next_lessons')))
         switch_enable_display_full_next_lessons.checkedChanged.connect(
             lambda checked: switch_checked('General', 'enable_display_full_next_lessons', checked))
-
-        select_weather_api = self.findChild(ComboBox, 'select_weather_api')  # 天气API选择
-        select_weather_api.addItems(weather.weather_manager.api_config['weather_api_list_zhCN'])
-        select_weather_api.setCurrentIndex(weather.weather_manager.api_config['weather_api_list'].index(
-            config_center.read_conf('Weather', 'api')
-        ))
-        select_weather_api.currentIndexChanged.connect(
-            lambda: config_center.write_conf('Weather', 'api',
-                                             weather.weather_manager.api_config['weather_api_list'][
-                                                 select_weather_api.currentIndex()])
-        )
-
-        api_key_edit = self.findChild(LineEdit, 'api_key_edit')  # API密钥
-        api_key_edit.setText(config_center.read_conf('Weather', 'api_key'))
-        api_key_edit.textChanged.connect(lambda: config_center.write_conf('Weather', 'api_key', api_key_edit.text()))
 
     def setup_about_interface(self):
         ab_scroll = self.findChild(SmoothScrollArea, 'ab_scroll')  # 触摸屏适配
@@ -2086,10 +2886,46 @@ class SettingsMenu(FluentWindow):
 
         window_status_combo = self.adInterface.findChild(ComboBox, 'window_status_combo')
         window_status_combo.addItems(list_.window_status)
-        window_status_combo.setCurrentIndex(int(config_center.read_conf('General', 'pin_on_top')))
-        window_status_combo.currentIndexChanged.connect(
-            lambda: config_center.write_conf('General', 'pin_on_top', str(window_status_combo.currentIndex()))
-        )  # 窗口状态
+        window_status_combo.setCurrentIndex(int(config_center.read_conf('General', 'pin_on_top', '0')))
+        if os.name != 'nt':
+            if window_status_combo.count() > 3:
+                window_status_combo.setItemEnabled(3, False)
+                original_text = window_status_combo.itemText(3)
+                if ' (仅Windows)' not in original_text:
+                    window_status_combo.setItemText(3, original_text + self.tr(' (仅Windows)'))
+
+        def on_window_status_changed():
+            """刷新窗口状态"""
+            current_index = window_status_combo.currentIndex()
+            if os.name == 'nt' and current_index == 3:
+                flyout = Flyout.create(
+                    icon=fIcon.INFO,
+                    title=self.tr('提示'),
+                    content=self.tr(
+                        '窗口会置于次底部, 但仍然比普通置顶要高一点点~'
+                        ),
+                    target=window_status_combo,
+                    parent=self,
+                    isClosable=True
+                )
+                flyout.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                flyout.show()
+            elif os.name != 'nt':
+                flyout = Flyout.create(
+                    icon=fIcon.REMOVE_FROM,
+                    title=self.tr('提示'),
+                    content=self.tr('当前平台可能不完全支持该功能~'),
+                    target=window_status_combo,
+                    parent=self,
+                    isClosable=True
+                )
+                flyout.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                flyout.show()
+            config_center.write_conf('General', 'pin_on_top', str(current_index))
+            if hasattr(utils, 'main_mgr') and utils.main_mgr is not None:
+                utils.main_mgr.reapply_window_states()
+        
+        window_status_combo.currentIndexChanged.connect(on_window_status_changed)
 
         switch_startup = self.adInterface.findChild(SwitchButton, 'switch_startup')
         switch_startup.setChecked(int(config_center.read_conf('General', 'auto_startup')))
@@ -2136,8 +2972,31 @@ class SettingsMenu(FluentWindow):
 
         switch_enable_click = self.adInterface.findChild(SwitchButton, 'switch_enable_click')
         switch_enable_click.setChecked(int(config_center.read_conf('General', 'enable_click')))
-        switch_enable_click.checkedChanged.connect(lambda checked: switch_checked('General', 'enable_click', checked))
-        # 允许点击
+
+        def on_enable_click_changed(checked):
+            switch_checked('General', 'enable_click', checked)
+            flyout = Flyout.create(
+                icon=fIcon.INFO,
+                title=self.tr('提示'),
+                content = self.tr(
+                    "窗口实体状态\n"
+                    "会认真挡住前面的点击哦~\n\n"
+                    "*请重启应用以完全生效"
+                ) if checked else self.tr(
+                    "鼠标穿透启用\n"
+                    "窗口不挡你啦,可以点穿它~\n\n"
+                    "*请重启应用以完全生效"
+                ),
+                target=switch_enable_click,
+                parent=self,
+                isClosable=True
+            )
+            flyout.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            flyout.show()
+            if hasattr(utils, 'main_mgr') and utils.main_mgr is not None:
+                utils.main_mgr.reapply_window_states()
+        switch_enable_click.checkedChanged.connect(on_enable_click_changed)
+        # 允许点击/鼠标穿透
 
         switch_enable_alt_schedule = self.adInterface.findChild(SwitchButton, 'switch_enable_alt_schedule')
         switch_enable_alt_schedule.setChecked(int(config_center.read_conf('General', 'enable_alt_schedule')))
@@ -2727,7 +3586,7 @@ class SettingsMenu(FluentWindow):
                 last_sync = current_manager.get_last_ntp_sync()
                 if last_sync:
                     sync_time_str = last_sync.strftime(self.tr('%Y年%m月%d日 - %H:%M:%S'))
-                    caption_label.setText(self.tr('上次NTP校准: {sync_time_str}'))
+                    caption_label.setText(self.tr('上次NTP校准: {sync_time_str}').format(sync_time_str=sync_time_str))
                 else:
                     caption_label.setText(self.tr('NTP时间: 尚未进行校准'))
             else:
@@ -3069,11 +3928,53 @@ class SettingsMenu(FluentWindow):
         config_center.write_conf('Audio', 'volume', str(slider_volume.value()))
 
     def show_search_city(self):
-        search_city_dialog = selectCity(self)
+        current_api = wd.weather_manager.get_current_api()
+        provider = wd.weather_manager.get_current_provider()
+        method = provider.config.get("method", "location_key")
+
+        if current_api == 'qweather':
+            choice_dialog = MessageBox(
+                title=self.tr('选择位置输入方式'),
+                content=self.tr('和风天气支持城市ID和经纬度两种方式，请选择您偏好的输入方式：'),
+                parent=self
+            )
+            choice_dialog.yesButton.setText(self.tr('城市搜索'))
+            choice_dialog.cancelButton.setText(self.tr('经纬度输入'))
+            if choice_dialog.exec():
+                search_city_dialog = selectCity(self, method='location_key')
+            else:
+                search_city_dialog = selectCity(self, method='coordinates')
+        else:
+            search_city_dialog = selectCity(self, method=method)
         if search_city_dialog.exec():
-            selected_city = search_city_dialog.city_list.selectedItems()
-            if selected_city:
-                config_center.write_conf('Weather', 'city', wd.search_code_by_name((selected_city[0].text(),'')))
+            city_changed = False
+            if search_city_dialog.method == 'location_key':
+                selected_city = search_city_dialog.city_list.selectedItems()
+                if selected_city:
+                    config_center.write_conf('Weather', 'city', wd.search_code_by_name((selected_city[0].text(),'')))
+                    city_changed = True
+            else:  # coordinates
+                lon = search_city_dialog.longitude_edit.text()
+                lat = search_city_dialog.latitude_edit.text()
+                if lon and lat:
+                    try:
+                        config_center.write_conf('Weather', 'city', f"{float(lon)},{float(lat)}")
+                        city_changed = True
+                    except ValueError:
+                        Flyout.create(
+                            icon=InfoBarIcon.ERROR,
+                            title=self.tr('无效的经纬度'),
+                            content=self.tr("请输入有效的经度和纬度值。"),
+                            target=search_city_dialog,
+                            parent=self,
+                            isClosable=True,
+                            aniType=FlyoutAnimationType.PULL_UP
+                        )
+            if city_changed:
+                if hasattr(self.weather_manager, 'get_weather_reminders') and hasattr(self.weather_manager.get_weather_reminders, 'clear_cache'):
+                    self.weather_manager.get_weather_reminders.clear_cache()
+                self._hide_weather_alerts_section()
+                self._on_refresh_clicked()
 
     def show_license(self):
         license_dialog = licenseDialog(self)
@@ -3852,8 +4753,7 @@ class SettingsMenu(FluentWindow):
             target=target,
             parent=self,
             isClosable=True,
-            aniType=aniType,
-            
+            aniType=aniType,  
         )
 
     # 上传课表到列表组件
@@ -4379,6 +5279,7 @@ class SettingsMenu(FluentWindow):
         self.addSubInterface(self.hdInterface, fIcon.QUESTION, self.tr('帮助'))
         self.addSubInterface(self.plInterface, fIcon.APPLICATION, self.tr('插件'), NavigationItemPosition.BOTTOM)
         self.navigationInterface.addSeparator(NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.wtInterface, fIcon.CLOUD, self.tr('天气'), NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.ctInterface, fIcon.BRUSH, self.tr('自定义'), NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.sdInterface, fIcon.RINGER, self.tr('提醒'), NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.adInterface, fIcon.SETTING, self.tr('高级选项'), NavigationItemPosition.BOTTOM)
@@ -4461,6 +5362,13 @@ class SettingsMenu(FluentWindow):
         except Exception as e:
             logger.error(f"清理TTS预览线程失败: {e}")
         
+        try:
+            tts_service = get_tts_service()
+            if hasattr(tts_service, '_manager') and tts_service._manager:
+                tts_service._manager.stop()
+        except Exception as e:
+            logger.warning(f"清理TTS管理器失败: {e}")
+
         self.closed.emit()
         event.accept()
 
@@ -4552,7 +5460,7 @@ def sp_get_class_num():  # 获取当前周课程数（未完成）
 
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    from i18n_manager import app
     settings = SettingsMenu()
     settings.show()
     # settings.setMicaEffectEnabled(True)

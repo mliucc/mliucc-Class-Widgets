@@ -1,5 +1,6 @@
 import ctypes
 import datetime as dt
+import time
 import json
 import os
 import platform
@@ -28,6 +29,7 @@ from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Actio
 from PyQt5.QtGui import QCloseEvent, QShowEvent, QHideEvent, QMouseEvent, QFocusEvent
 from PyQt5.QtCore import QCoreApplication
 
+from i18n_manager import global_i18n_manager, app
 import conf
 import list_
 import tip_toast
@@ -36,25 +38,18 @@ import utils
 import menu
 import weather as db
 from conf import base_directory, load_theme_config
-from extra_menu import ExtraMenu, open_settings
+from extra_menu import ExtraMenu, open_settings, settings
 from generate_speech import generate_speech_sync, list_pyttsx3_voices
-from menu import open_plaza, I18nManager
+from menu import open_plaza
 from weather import WeatherReportThread as weatherReportThread
-from weather import get_unified_weather_alerts, get_alert_image
+from weather import get_unified_weather_alerts, get_alert_image, weather_manager
 from network_thread import check_update
-from play_audio import play_audio
 from plugin import p_loader
 from utils import restart, stop, update_timer, DarkModeWatcher, TimeManagerFactory
 from file import config_center, schedule_center
 
 if os.name == 'nt':
     import pygetwindow
-
-# 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
 today = dt.date.today()
 
@@ -619,8 +614,8 @@ class ErrorDialog(Dialog):  # 重大错误提示框
             stop()
         
         super().__init__(
-            self.tr('Class Widgets 崩溃报告'),
-            self.tr('抱歉！Class Widgets 发生了严重的错误从而无法正常运行。您可以保存下方的错误信息并向他人求助。'
+            QCoreApplication.translate('ErrorDialog', 'Class Widgets 崩溃报告'),
+            QCoreApplication.translate('ErrorDialog', '抱歉！Class Widgets 发生了严重的错误从而无法正常运行。您可以保存下方的错误信息并向他人求助。'
             '若您认为这是程序的Bug，请点击“报告此问题”或联系开发者。'),
             parent
         )
@@ -849,14 +844,19 @@ class PluginMethod:  # 插件方法
         """
         播放音频文件
 
-        参数：
+        Args:
         file_path (str): 要播放的音频文件路径
         tts_delete_after (bool): 播放后是否删除文件（默认True）
 
-        说明：
+        Note:
         - 删除操作有重试机制（3次尝试）
         """
-        play_audio(file_path, tts_delete_after)
+        if tts_delete_after:
+            from play_audio import play_audio_async
+            play_audio_async(file_path, cleanup_callback=True)
+        else:
+            from play_audio import play_audio
+            play_audio(file_path)
 
 
 class WidgetsManager:
@@ -926,15 +926,18 @@ class WidgetsManager:
             logger.info(f'显示小组件：{widget.path, widget.windowTitle()}')
 
     def adjust_ui(self) -> None:  # 更新小组件UI
+        if self.state == 0:
+            return
         for widget in self.widgets:
             # 调整窗口尺寸
             width = self.get_widget_width(widget.path)
             height = self.get_widgets_height()
-            pos_x = self.get_widget_pos(widget.path, widget.widget_cnt)[0]
+            pos = self.get_widget_pos(widget.path, widget.widget_cnt)
+            pos_x, pos_y = pos[0], pos[1]
             op = int(config_center.read_conf('General', 'opacity')) / 100
 
             if widget.animation is None:
-                widget.widget_transition(pos_x, width, height, op)
+                widget.widget_transition(pos_x, width, height, op, pos_y)
 
     def get_widget_pos(self, path: str, cnt: Optional[int] = None) -> List[int]:  # 获取小组件位置
         num = self.widgets_list.index(path) if cnt is None else cnt
@@ -1031,6 +1034,15 @@ class WidgetsManager:
         else:
             self.hide_windows()
 
+    def reapply_window_states(self) -> None:
+        """应用组件窗口状态"""
+        for widget in self.widgets:
+            try:
+                widget.apply_window_state()
+                # logger.debug(f'重新应用小组件窗口状态：{widget.path}')
+            except Exception as e:
+                logger.error(f'应用小组件 {widget.path} 窗口状态时出错: {e}')
+
     def cleanup_resources(self):
         self.hide_status = None # 重置hide_status
         widgets_to_clean = list(self.widgets)
@@ -1071,7 +1083,8 @@ class WidgetsManager:
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint |
+        Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
         time = int(config_center.read_conf('Plugin', 'aguto_delay'))
         self.action = action
 
@@ -1118,7 +1131,7 @@ class openProgressDialog(QWidget):
     def init_ui(self) -> None:
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
-            Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+            Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -1187,7 +1200,8 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint |
+        Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
         self.animation_rect = None
         self.animation = None
         self.m_Position = None
@@ -1362,9 +1376,9 @@ class FloatingWidget(QWidget):  # 浮窗
 
         # 根据平台和设置应用窗口标志
         if sys.platform == 'darwin':
-            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Widget | Qt.X11BypassWindowManagerHint
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Widget | Qt.BypassWindowManagerHint
         else:
-            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool | Qt.X11BypassWindowManagerHint
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool | Qt.BypassWindowManagerHint
 
         self.setWindowFlags(flags)
 
@@ -1373,7 +1387,7 @@ class FloatingWidget(QWidget):  # 浮窗
             if not self._is_topmost_callback_added:
                 try:
                     if hasattr(utils, 'update_timer') and utils.update_timer:
-                        utils.update_timer.add_callback(self._ensure_topmost)
+                        utils.update_timer.add_callback(self._ensure_topmost, 0.5)
                         self._is_topmost_callback_added = True
                         self._ensure_topmost() # 立即执行一次确保初始置顶
                     else:
@@ -1385,12 +1399,12 @@ class FloatingWidget(QWidget):  # 浮窗
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.Widget |  # macOS 失焦时仍然显示
-                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
                                 Qt.WindowType.Tool |
-                                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
                                 )
 
         backgnd = self.findChild(QFrame, 'backgnd')
@@ -1673,7 +1687,8 @@ class FloatingWidget(QWidget):  # 浮窗
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent: WidgetsManager = WidgetsManager, path: str = 'widget-time.ui', enable_tray: bool = False, cnt: int = 0, position: Optional[Tuple[int, int]] = None, widget_cnt: Optional[int] = None) -> None:
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowFlags(self.windowFlags() |
+        Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
 
         self.cnt = cnt
         self.widget_cnt = widget_cnt
@@ -1683,7 +1698,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.last_widgets = list_.get_widget_config()
         self.path = path
         theme_config = conf.load_theme_config(str('default' if theme is None else theme)).config
-        self.last_code = 101010100
+        initial_api = config_center.read_conf('Weather', 'api') or 'unknown'
+        initial_city = config_center.read_conf('Weather', 'city') or '0'
+        self.last_code = f"{initial_api}|{initial_city}"
         self.radius = theme_config.radius
         self.last_theme = config_center.read_conf('General', 'theme')
         self.last_color_mode = config_center.read_conf('General', 'color_mode')
@@ -1725,7 +1742,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if path == 'widget-time.ui':  # 日期显示
             self.date_text = self.findChild(QLabel, 'date_text')
-            self.date_text.setText(self.tr('{year} 年 {month}').format(year=today.year, month=list_.month[today.month]))
+            self.date_text.setText(self.tr('{year} 年 {month}').format(year=today.year, month=list_.month[today.month - 1]))
             self.day_text = self.findChild(QLabel, 'day_text')
             self.day_text.setText(self.tr('{day}日  {week}').format(day=today.day, week=list_.week[today.weekday()]))
 
@@ -1782,10 +1799,33 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.alert_icon_animation.setDuration(700)
             self.alert_icon_animation.setEasingCurve(QEasingCurve.OutCubic)
             
-            self.showing_temperature = True  # 跟踪状态(预警/气温)
+            self.showing_temperature = True  # 是否正在显示气温
+            self.showing_alert = False  # 是否正在显示预警
+
+            # 天气提醒标签
+            self.weather_reminder_text = QLabel(self)
+            self.weather_reminder_text.setAlignment(Qt.AlignCenter)
+            self.weather_reminder_text.setStyleSheet(self.temperature.styleSheet())
+            self.weather_reminder_text.setFont(self.temperature.font())
+            self.weather_reminder_text.setFixedWidth(138)
+            self.weather_reminder_text.hide()
+            
+            # 天气提醒图标
+            self.reminder_icon = IconWidget(self)
+            self.reminder_icon.setFixedSize(26, 26)
+            self.reminder_icon.hide()
+
+            content_layout.addWidget(self.reminder_icon)
+            content_layout.addWidget(self.weather_reminder_text)
+            
+            # 天气提醒状态变量
+            self.current_reminders = []  # 存储提醒列表
+            self.current_reminder_index = 0  # 当前提醒索引
+            self.showing_reminder = False  # 是否正在显示提醒
 
             self.weather_timer = QTimer(self)
-            self.weather_timer.setInterval(30 * 60 * 1000)  # 30分钟更新一次
+            refresh_interval = int(config_center.read_conf('Weather', 'refresh_interval'))
+            self.weather_timer.setInterval(refresh_interval * 60 * 1000)  # 从配置读取间隔
             self.weather_timer.timeout.connect(self.get_weather_data)
             self.weather_timer.start()
             self.get_weather_data()
@@ -1854,51 +1894,130 @@ class DesktopWidget(QWidget):  # 主要小组件
         # 设置窗口无边框和透明背景
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, config_center.read_conf('General', 'enable_click') == '0')
-
-        if config_center.read_conf('General', 'pin_on_top') == '1':  # 置顶
-            self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
-                Qt.WindowType.WindowDoesNotAcceptFocus | Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
-            )
-            # 修改为使用定时器确保持续置顶
-            if os.name == 'nt':
-                if not self._is_topmost_callback_added:
-                    try:
-                        # 确保 utils.update_timer 存在且有效
-                        if hasattr(utils, 'update_timer') and utils.update_timer:
-                            utils.update_timer.add_callback(self._ensure_topmost)
-                            self._is_topmost_callback_added = True
-                            self._ensure_topmost() # 立即执行一次确保初始置顶
-                            # logger.debug("已添加置顶定时回调。")
-                        else:
-                            logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
-                    except Exception as e:
-                        logger.error(f"添加置顶回调时出错: {e}")
-
-        elif config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
-            # 避免使用WindowStaysOnBottomHint,防止争夺底层
-            self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint |
-                Qt.WindowType.WindowDoesNotAcceptFocus
-            )
-            if os.name == 'nt':
-                def set_window_pos():
-                    hwnd = self.winId().__int__()
-                    # 稍高于最底层的值
-                    ctypes.windll.user32.SetWindowPos(hwnd, 2, 0, 0, 0, 0, 0x0214)
-                QTimer.singleShot(100, set_window_pos)
-            else:
-                QTimer.singleShot(100, self.lower)
-        else:
-            self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint
-            )
-
+        self.apply_window_state()
         if sys.platform == 'darwin':
             self.setWindowFlag(Qt.WindowType.Widget, True)
         else:
             self.setWindowFlag(Qt.WindowType.Tool, True)
+
+    def apply_window_state(self) -> None:
+        """应用窗口状态"""
+        if self._is_topmost_callback_added:
+            try:
+                utils.update_timer.remove_callback(self._ensure_topmost)
+                self._is_topmost_callback_added = False
+            except (ValueError, AttributeError):
+                pass
+
+        was_visible = self.isVisible()
+        current_geometry = self.geometry() if was_visible else None
+        current_opacity = self.windowOpacity() if was_visible else 1.0
+        pin_on_top = config_center.read_conf('General', 'pin_on_top', '0')
+        enable_click = config_center.read_conf('General', 'enable_click', '1')
+        self.state_animation_group = QParallelAnimationGroup(self)
+        if was_visible:
+            self.fade_out_animation = QPropertyAnimation(self, b"windowOpacity")
+            self.fade_out_animation.setDuration(200)  # 淡出
+            self.fade_out_animation.setStartValue(current_opacity)
+            self.fade_out_animation.setEndValue(0.0)
+            self.fade_out_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.state_animation_group.addAnimation(self.fade_out_animation)
+
+        def apply_state_changes():
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, enable_click == '0')
+            if pin_on_top == '1':  # 置顶
+                new_flags = (
+                    Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
+                    Qt.WindowType.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint | Qt.Tool
+                )
+            elif pin_on_top == '2':  # 置底
+                new_flags = (
+                    Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint |
+                    Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool
+                )
+            elif pin_on_top == '3':  # 置于次级底部
+                new_flags = (
+                    Qt.WindowType.FramelessWindowHint |
+                    Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool
+                )
+            else:
+                new_flags = Qt.WindowType.FramelessWindowHint | Qt.Tool
+            self.setWindowFlags(new_flags)
+
+            QApplication.processEvents()
+            self.update()
+            if pin_on_top == '2':  # 置底
+                self.show()
+                parent = self.parent()
+                if hasattr(parent, 'get_widget_pos'):
+                    if hasattr(parent, 'get_start_pos'):
+                        parent.get_start_pos()
+                    pos = parent.get_widget_pos(self.path, None)
+                    if pos:
+                        self.move(pos[0], pos[1])
+                if self.width() == 0 or self.height() == 0:
+                    self.resize(self.w, self.h)
+            else:
+                self.show()
+                if current_geometry and current_geometry.isValid():
+                    self.setGeometry(current_geometry)
+                else:
+                    parent = self.parent()
+                    if hasattr(parent, 'get_widget_pos'):
+                        if hasattr(parent, 'get_start_pos'):
+                            parent.get_start_pos()
+                        pos = parent.get_widget_pos(self.path, None)
+                        if pos:
+                            self.move(pos[0], pos[1])
+                self.raise_()
+            self.fade_in_animation = QPropertyAnimation(self, b"windowOpacity")
+            self.fade_in_animation.setDuration(250)  # 淡入
+            self.fade_in_animation.setStartValue(0.0)
+            self.fade_in_animation.setEndValue(current_opacity)
+            self.fade_in_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.fade_in_animation.start()
+
+            if pin_on_top == '1':  # 置顶
+                if os.name == 'nt':
+                    if not self._is_topmost_callback_added:
+                        try:
+                            if hasattr(utils, 'update_timer') and utils.update_timer:
+                                utils.update_timer.add_callback(self._ensure_topmost, 0.5)
+                                self._is_topmost_callback_added = True
+                                self._ensure_topmost()
+                            else:
+                                logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
+                        except Exception as e:
+                            logger.error(f"添加置顶回调时出错: {e}")
+            
+            elif pin_on_top == '2':  # 置底
+                self.lower()
+            
+            elif pin_on_top == '3':  # 置于次级底部
+                if os.name == 'nt':
+                    def set_window_pos_secondary():
+                        try:
+                            if self.isVisible() and self.width() > 0 and self.height() > 0:
+                                hwnd = self.winId().__int__()
+                                SWP_NOSIZE = 0x0001
+                                SWP_NOMOVE = 0x0002
+                                SWP_NOACTIVATE = 0x0010
+                                SWP_SHOWWINDOW = 0x0040
+                                HWND_NOTOPMOST = 2
+                                ctypes.windll.user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
+                                self.lower()
+                        except Exception as e:
+                            logger.error(f"设置窗口次级置底时出错: {e}")
+                    if self.width() == 0 or self.height() == 0:
+                        self.resize(self.w, self.h)
+                    set_window_pos_secondary()
+                else:
+                    self.lower()
+        if was_visible:
+            self.state_animation_group.finished.connect(apply_state_changes)
+            self.state_animation_group.start()
+        else:
+            apply_state_changes()
 
     def _ensure_topmost(self) -> None:
         # 突然忘记写移除了,不写了,应该没事(
@@ -1945,6 +2064,16 @@ class DesktopWidget(QWidget):  # 主要小组件
                     logger.debug(f"因错误 {e} 移除置顶回调。")
 
     def closeEvent(self, event):
+        try:
+            if hasattr(self, 'weather_thread') and self.weather_thread.isRunning():
+                self.weather_thread.stop()
+                self.weather_thread.wait(1000)
+            if hasattr(self, 'reminder_thread') and self.reminder_thread.isRunning():
+                self.reminder_thread.stop()
+                self.reminder_thread.wait(1000)
+        except Exception as e:
+            logger.error(f"清理天气线程时出错: {e}")
+        
         if self._is_topmost_callback_added:
             try:
                 utils.update_timer.remove_callback(self._ensure_topmost)
@@ -2005,7 +2134,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.tray_menu.addActions([
             Action(fIcon.SHOPPING_CART, self.tr('插件广场'), triggered=open_plaza),
             Action(fIcon.DEVELOPER_TOOLS, self.tr('额外选项'), triggered=self.open_extra_menu),
-            Action(fIcon.SETTING, self.tr('设置'), triggered=open_settings)
+            Action(fIcon.SETTING, self.tr('设置'), triggered=lambda: open_settings(self))
         ])
         self.tray_menu.addSeparator()
         self.tray_menu.addAction(Action(fIcon.SYNC, self.tr('重新启动'), triggered=restart))
@@ -2076,7 +2205,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         cd_list = get_countdown()
 
         if path == 'widget-time.ui':  # 日期显示
-            self.date_text.setText(self.tr('{year} 年 {month}').format(year=today.year, month=list_.month[today.month]))
+            self.date_text.setText(self.tr('{year} 年 {month}').format(year=today.year, month=list_.month[today.month - 1]))
             self.day_text.setText(self.tr('{day}日  {week}').format(day=today.day, week=list_.week[today.weekday()]))
 
         if path == 'widget-current-activity.ui':  # 当前活动
@@ -2131,188 +2260,475 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def get_weather_data(self) -> None:
         logger.info('获取天气数据')
+        if hasattr(weather_manager, 'get_weather_reminders') and hasattr(weather_manager.get_weather_reminders, 'clear_cache'):
+            weather_manager.get_weather_reminders.clear_cache()
+        if hasattr(weather_manager, 'fetch_weather_data') and hasattr(weather_manager.fetch_weather_data, 'clear_cache'):
+            weather_manager.fetch_weather_data.clear_cache()
+        self._reset_weather_alert_state()
+        # 停止旧的天气线程
+        if hasattr(self, 'weather_thread') and self.weather_thread.isRunning():
+            self.weather_thread.stop()
+            self.weather_thread.wait(1000)  # 等待线程结束
+        
         if not hasattr(self, 'weather_thread') or not self.weather_thread.isRunning():
             self.weather_thread = weatherReportThread()
             self.weather_thread.weather_signal.connect(self.update_weather_data)
             self.weather_thread.start()
+    
+    def _on_reminders_ready(self, reminders: list) -> None:
+        """获取的天气提醒数据"""
+        try:
+            self.current_reminders = reminders
+            self.current_reminder_index = 0
+            
+            if self.current_reminders:
+                logger.debug(f'获取到 {len(self.current_reminders)} 个天气提醒')
+                for i, reminder in enumerate(self.current_reminders):
+                    logger.debug(f'提醒 {i+1}: {reminder.get("title", "未知")}')
+            self._update_weather_alert_display()
+        except Exception as e:
+            logger.error(f'处理天气提醒数据失败: {e}')
+    def _on_alerts_ready(self, alerts: list) -> None:
+        """处理获取的天气预警数据"""
+        try:
+            self.current_alerts = alerts
+            self.current_alert_index = 0
+            if self.current_alerts:
+                logger.debug(f'获取到 {len(self.current_alerts)} 个天气预警')
+                for i, alert in enumerate(self.current_alerts):
+                    logger.debug(f'预警 {i+1}: {alert.get("title", "未知")}')
+            self._update_weather_alert_display()
+        except Exception as e:
+            logger.error(f'处理天气预警数据失败: {e}')
+    
+    def _update_weather_alert_display(self) -> None:
+        """更新天气预警和提醒的UI显示"""
+        try:
+            if self.current_alerts or self.current_reminders:
+                self.weather_alert_text.setFixedWidth(80)
+                self.weather_alert_text.setFixedHeight(40)
+                self._display_current_alert()
+                if not hasattr(self, 'weather_alert_timer') or not self.weather_alert_timer:
+                    self.weather_alert_timer = QTimer(self)
+                    self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
+                self.weather_alert_timer.start(6000)  # 6秒切换间隔
+            else:
+                self.weather_alert_text.hide()
+                self.alert_icon.hide()
+                self.weather_icon.show()
+                self.temperature.show()
+                self.showing_temperature = True
+                self.showing_alert = False
+                self.showing_reminder = False
+                if hasattr(self, 'weather_alert_timer') and self.weather_alert_timer:
+                    self.weather_alert_timer.stop()
+                    self._reset_weather_alert_state()
+        except Exception as e:
+            logger.error(f'更新天气预警显示失败: {e}')
 
     def detect_weather_code_changed(self) -> None:
-        current_code = config_center.read_conf('Weather')
-        if current_code != self.last_code:
-            self.last_code = current_code
-            self.get_weather_data()
+        current_api = config_center.read_conf('Weather', 'api')
+        current_city = config_center.read_conf('Weather', 'city')
+        current_key_config = f"{current_api}|{current_city}"
+        
+        if current_key_config != self.last_code:
+            last_api = self.last_code.split('|')[0] if '|' in self.last_code else ''
+            if current_api != last_api:
+                # logger.debug(f'检测到天气API变化: {last_api} -> {current_api}，等待城市代码稳定')
+                self.last_code = current_key_config
+                from weather import on_weather_api_changed
+                on_weather_api_changed(current_api)
+            else:
+                # logger.debug(f'检测到城市配置变化: {self.last_code} -> {current_key_config}')
+                self.last_code = current_key_config
+                self.get_weather_data()
 
     def toggle_weather_alert(self) -> None:
-        """在温度和预警之间切换显示"""
-        if self.showing_temperature:
-            self._fade_to_alert()
-        else:
-            if (hasattr(self, 'current_alerts') and self.current_alerts and 
-                len(self.current_alerts) > 1 and hasattr(self, 'current_alert_index')):
+        """按照配置顺序循环显示天气信息"""
+        SWITCH_INTERVAL = 6000  # 6秒切换间隔
+        widget_display_config = config_center.read_conf('Weather', 'widget_display') or 'temperature,alert,reminder'
+        widget_display_config = widget_display_config.strip('"\'')
+        display_order = [item.strip().strip('"\'') for item in widget_display_config.split(',') if item.strip()]
+        if not display_order:
+            display_order = ['temperature', 'alert', 'reminder']
+
+        current_mode = self._get_current_display_mode()
+        next_mode = self._get_next_display_mode(current_mode, display_order)
+        self._switch_to_mode(next_mode)
+        if hasattr(self, 'weather_alert_timer'):
+            self.weather_alert_timer.start(SWITCH_INTERVAL)
+
+    def _get_current_display_mode(self) -> str:
+        """获取当前显示模式"""
+        if getattr(self, 'showing_temperature', True):
+            return 'temperature'
+        elif getattr(self, 'showing_alert', False):
+            return 'alert'
+        elif getattr(self, 'showing_reminder', False):
+            return 'reminder'
+        return 'temperature'  # 默认
+
+    def _get_next_display_mode(self, current_mode: str, display_order: list) -> str:
+        """获取下一个显示模式"""
+        if current_mode == 'alert' and hasattr(self, 'current_alerts') and self.current_alerts:
+            if self.current_alert_index < len(self.current_alerts) - 1:
                 self.current_alert_index += 1
-                if self.current_alert_index >= len(self.current_alerts):
-                    self.current_alert_index = 0
-                    self._fade_to_temperature()
-                else:
-                    self._cycle_to_next_alert_with_animation()
-            else:
-                self._fade_to_temperature()
+                return 'alert'  # 继续显示下一个预警
+        if current_mode == 'reminder' and hasattr(self, 'current_reminders') and self.current_reminders:
+            if self.current_reminder_index < len(self.current_reminders) - 1:
+                self.current_reminder_index += 1
+                return 'reminder'  # 继续显示下一个提醒
+        if current_mode == 'alert':
+            self.current_alert_index = 0
+        elif current_mode == 'reminder':
+            self.current_reminder_index = 0
+
+        try:
+            current_index = display_order.index(current_mode)
+        except ValueError:
+            current_index = -1
+        for i in range(len(display_order)):
+            next_index = (current_index + 1 + i) % len(display_order)
+            next_mode = display_order[next_index]
+            if self._has_content_for_mode(next_mode):
+                return next_mode
+
+        return 'temperature'
     
-    def _fade_to_alert(self) -> None:
-        """从温度渐变到预警显示"""
-        self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
-        self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
-        self.weather_icon.setGraphicsEffect(self.weather_opacity)
-        self.temperature.setGraphicsEffect(self.temperature_opacity)
-        weather_fade_out = QPropertyAnimation(self.weather_opacity, b'opacity')
-        temp_fade_out = QPropertyAnimation(self.temperature_opacity, b'opacity')
-        weather_fade_out.setDuration(700)
-        temp_fade_out.setDuration(700)
-        weather_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
-        temp_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
-        weather_fade_out.setStartValue(1.0)
-        weather_fade_out.setEndValue(0.0)
-        temp_fade_out.setStartValue(1.0)
-        temp_fade_out.setEndValue(0.0)
-        self.fade_out_group = QParallelAnimationGroup(self)
-        self.fade_out_group.addAnimation(weather_fade_out)
-        self.fade_out_group.addAnimation(temp_fade_out)
-        if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
-            self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
-            self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
-        if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
-            self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
-            self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+    def _has_content_for_mode(self, mode: str) -> bool:
+        """检查是否有内容可显示"""
+        if mode == 'temperature':
+            return True
+        elif mode == 'alert':
+            return hasattr(self, 'current_alerts') and bool(self.current_alerts)
+        elif mode == 'reminder':
+            return hasattr(self, 'current_reminders') and bool(self.current_reminders)
+        return False
+    
+    def _switch_to_mode(self, target_mode: str) -> None:
+        """切换到指定的显示模式"""
+        current_mode = self._get_current_display_mode()
+        if current_mode == target_mode:
+            # 同类项切换
+            if target_mode == 'alert':
+                self._cycle_to_next_alert_with_animation()
+            elif target_mode == 'reminder':
+                self._cycle_to_next_reminder_with_animation()
+            return
+
+        # 不同类型之间切换
+        self._unified_fade_transition(current_mode, target_mode)
+
+    def _unified_fade_transition(self, from_mode: str, to_mode: str) -> None:
+        """统一切换动画组"""
+        fade_out_group = QParallelAnimationGroup(self)
+        if from_mode == 'temperature':
+            self._add_temperature_fade_out(fade_out_group)
+        elif from_mode == 'alert':
+            self._add_alert_fade_out(fade_out_group)
+        elif from_mode == 'reminder':
+            self._add_reminder_fade_out(fade_out_group)
+        def on_fade_out_finished():
+            self._hide_current_mode(from_mode)
+            self._show_target_mode(to_mode)
+        try:
+            fade_out_group.finished.disconnect()
+        except TypeError:
+            pass
         
-        def _start_alert_fade_in():
-            self._display_current_alert()
-            alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
-            alert_icon_fade_in = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
-            alert_text_fade_in.setDuration(700)
-            alert_icon_fade_in.setDuration(700)
-            alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-            alert_icon_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-            alert_text_fade_in.setStartValue(0.0)
-            alert_text_fade_in.setEndValue(1.0)
-            alert_icon_fade_in.setStartValue(0.0)
-            alert_icon_fade_in.setEndValue(1.0)
-            self.fade_in_group = QParallelAnimationGroup(self)
-            self.fade_in_group.addAnimation(alert_text_fade_in)
-            self.fade_in_group.addAnimation(alert_icon_fade_in)
+        fade_out_group.finished.connect(on_fade_out_finished)
+        fade_out_group.start()
+    
+    def _add_temperature_fade_out(self, fade_out_group: QParallelAnimationGroup) -> None:
+        """温度控件淡出动画"""
+        try:
+            if self.weather_icon and not self.weather_icon.parent() is None:
+                self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+                self.weather_icon.setGraphicsEffect(self.weather_opacity)
+            else:
+                return
+            if self.temperature and not self.temperature.parent() is None:
+                self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
+                self.temperature.setGraphicsEffect(self.temperature_opacity)
+            else:
+                return
+            weather_fade_out = QPropertyAnimation(self.weather_opacity, b'opacity')
+            temp_fade_out = QPropertyAnimation(self.temperature_opacity, b'opacity')
+            self._setup_animation(weather_fade_out, 1.0, 0.0)
+            self._setup_animation(temp_fade_out, 1.0, 0.0)
+            fade_out_group.addAnimation(weather_fade_out)
+            fade_out_group.addAnimation(temp_fade_out)
+        except RuntimeError as e:
+            logger.warning(f'创建温度淡出动画失败: {e}')
             self.weather_icon.hide()
             self.temperature.hide()
-            self.weather_alert_opacity.setOpacity(0.0)
-            self.alert_icon_opacity.setOpacity(0.0)
-            self.weather_alert_text.show()
-            self.alert_icon.show()
-            self.fade_in_group.start()
-            if hasattr(self, 'weather_info_timer'):
-                self.weather_info_timer.start(3000)
-        try: 
-            self.fade_out_group.finished.disconnect()
-        except TypeError: 
-            pass
-        self.fade_out_group.finished.connect(_start_alert_fade_in)
-        self.fade_out_group.start()
-        self.showing_temperature = False
     
-    def _fade_to_temperature(self) -> None:
-        """从预警渐变到温度显示"""
-        if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
-            self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
-            self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
-        if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
-            self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
-            self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
-        alert_text_fade_out = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
-        alert_icon_fade_out = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
-        alert_text_fade_out.setDuration(500)
-        alert_icon_fade_out.setDuration(500)
-        alert_text_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
-        alert_icon_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
-        alert_text_fade_out.setStartValue(1.0)
-        alert_text_fade_out.setEndValue(0.0)
-        alert_icon_fade_out.setStartValue(1.0)
-        alert_icon_fade_out.setEndValue(0.0)
-        self.fade_out_group = QParallelAnimationGroup(self)
-        self.fade_out_group.addAnimation(alert_text_fade_out)
-        self.fade_out_group.addAnimation(alert_icon_fade_out)
+    def _add_alert_fade_out(self, fade_out_group: QParallelAnimationGroup) -> None:
+        """预警控件的淡出动画"""
+        try:
+            if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity or not self.weather_alert_opacity.parent():
+                self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+                self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+            if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity or not self.alert_icon_opacity.parent():
+                self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+                self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+            
+            alert_text_fade_out = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+            alert_icon_fade_out = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
+            self._setup_animation(alert_text_fade_out, 1.0, 0.0)
+            self._setup_animation(alert_icon_fade_out, 1.0, 0.0)
+            fade_out_group.addAnimation(alert_text_fade_out)
+            fade_out_group.addAnimation(alert_icon_fade_out)
+        except RuntimeError as e:
+            logger.warning(f'创建预警淡出动画失败: {e}')
+            self.weather_alert_text.hide()
+            self.alert_icon.hide()
+    
+    def _add_reminder_fade_out(self, fade_out_group: QParallelAnimationGroup) -> None:
+        """提醒控件的淡出动画"""
+        try:
+            if hasattr(self, 'reminder_opacity') and self.reminder_opacity:
+                if self.reminder_opacity.parent():
+                    reminder_text_fade_out = QPropertyAnimation(self.reminder_opacity, b'opacity')
+                    self._setup_animation(reminder_text_fade_out, 1.0, 0.0)
+                    fade_out_group.addAnimation(reminder_text_fade_out)
+            if hasattr(self, 'reminder_icon_opacity') and self.reminder_icon_opacity:
+                if self.reminder_icon_opacity.parent():
+                    reminder_icon_fade_out = QPropertyAnimation(self.reminder_icon_opacity, b'opacity')
+                    self._setup_animation(reminder_icon_fade_out, 1.0, 0.0)
+                    fade_out_group.addAnimation(reminder_icon_fade_out)
+        except RuntimeError as e:
+            logger.warning(f'创建提醒淡出动画失败: {e}')
+            if hasattr(self, 'reminder_text'):
+                self.reminder_text.hide()
+            if hasattr(self, 'reminder_icon'):
+                self.reminder_icon.hide()
+    
+    def _setup_animation(self, animation: QPropertyAnimation, start_value: float, end_value: float, time: float = 500) -> None:
+        """动画属性"""
+        animation.setDuration(time)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.setStartValue(start_value)
+        animation.setEndValue(end_value)
+    
+    def _hide_current_mode(self, mode: str) -> None:
+        """隐藏当前模式控件"""
+        if mode == 'temperature':
+            self._hide_temperature()
+        elif mode == 'alert':
+            self._hide_alert()
+        elif mode == 'reminder':
+            self._hide_reminder()
+
+    def _show_target_mode(self, mode: str) -> None:
+        """显示目标模式控件"""
+        if mode == 'temperature':
+            self._fade_in_temperature()
+        elif mode == 'alert':
+            self._fade_in_alert()
+        elif mode == 'reminder':
+            self._fade_in_reminder()
+
+    def _fade_in_temperature(self) -> None:
+        """淡入温度控件"""
+        # 设置状态
+        self.showing_temperature = True
+        self.showing_alert = False
+        self.showing_reminder = False
         if not hasattr(self, 'weather_opacity') or not self.weather_opacity:
             self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
             self.weather_icon.setGraphicsEffect(self.weather_opacity)
         if not hasattr(self, 'temperature_opacity') or not self.temperature_opacity:
             self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
             self.temperature.setGraphicsEffect(self.temperature_opacity)
-
-        def _start_temperature_fade_in():
+        try:
+            if self.weather_opacity and hasattr(self.weather_opacity, 'opacity'):
+                weather_fade_in = QPropertyAnimation(self.weather_opacity, b'opacity')
+                self._setup_animation(weather_fade_in, 0.0, 1.0)
+            else:
+                self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+                self.weather_icon.setGraphicsEffect(self.weather_opacity)
+                weather_fade_in = QPropertyAnimation(self.weather_opacity, b'opacity')
+                self._setup_animation(weather_fade_in, 0.0, 1.0)
+        except RuntimeError:
+            self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+            self.weather_icon.setGraphicsEffect(self.weather_opacity)
             weather_fade_in = QPropertyAnimation(self.weather_opacity, b'opacity')
+            self._setup_animation(weather_fade_in, 0.0, 1.0)
+
+        try:
+            if self.temperature_opacity and hasattr(self.temperature_opacity, 'opacity'):
+                temp_fade_in = QPropertyAnimation(self.temperature_opacity, b'opacity')
+                self._setup_animation(temp_fade_in, 0.0, 1.0)
+            else:
+                self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
+                self.temperature.setGraphicsEffect(self.temperature_opacity)
+                temp_fade_in = QPropertyAnimation(self.temperature_opacity, b'opacity')
+                self._setup_animation(temp_fade_in, 0.0, 1.0)
+        except RuntimeError:
+            self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
+            self.temperature.setGraphicsEffect(self.temperature_opacity)
             temp_fade_in = QPropertyAnimation(self.temperature_opacity, b'opacity')
-            weather_fade_in.setDuration(500)
-            temp_fade_in.setDuration(500)
-            weather_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-            temp_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-            weather_fade_in.setStartValue(0.0)
-            weather_fade_in.setEndValue(1.0)
-            temp_fade_in.setStartValue(0.0)
-            temp_fade_in.setEndValue(1.0)
-            self.fade_in_group = QParallelAnimationGroup(self)
-            self.fade_in_group.addAnimation(weather_fade_in)
-            self.fade_in_group.addAnimation(temp_fade_in)
-            self.weather_alert_text.hide()
-            self.alert_icon.hide()
+            self._setup_animation(temp_fade_in, 0.0, 1.0)
+        fade_in_group = QParallelAnimationGroup(self)
+        fade_in_group.addAnimation(weather_fade_in)
+        fade_in_group.addAnimation(temp_fade_in)
+        try:
             self.weather_opacity.setOpacity(0.0)
             self.temperature_opacity.setOpacity(0.0)
-            self.weather_icon.show()
-            self.temperature.show()
-            self.fade_in_group.start()
-        try: 
-            self.fade_out_group.finished.disconnect()
-        except TypeError: 
+        except RuntimeError:
             pass
-        self.fade_out_group.finished.connect(_start_temperature_fade_in)
-        self.fade_out_group.start()
-        self.showing_temperature = True
+        self.weather_icon.show()
+        self.temperature.show()
+        fade_in_group.start()
+
+    def _fade_in_alert(self) -> None:
+        """淡入预警控件"""
+        if not self._has_content_for_mode('alert'):
+            self._fade_in_temperature()
+            return
+        self.showing_temperature = False
+        self.showing_alert = True
+        self.showing_reminder = False
+        if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
+            self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+            self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+        if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
+            self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+            self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+        self._display_current_alert()
+        alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+        alert_icon_fade_in = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
+        self._setup_animation(alert_text_fade_in, 0.0, 1.0)
+        self._setup_animation(alert_icon_fade_in, 0.0, 1.0)
+        fade_in_group = QParallelAnimationGroup(self)
+        fade_in_group.addAnimation(alert_text_fade_in)
+        fade_in_group.addAnimation(alert_icon_fade_in)
+        self.weather_alert_opacity.setOpacity(0.0)
+        self.alert_icon_opacity.setOpacity(0.0)
+        self.weather_alert_text.show()
+        self.alert_icon.show()
+        fade_in_group.start()
     
+    def _fade_in_reminder(self) -> None:
+        """淡入提醒控件"""
+        if not self._has_content_for_mode('reminder'):
+            self._fade_in_temperature()
+            return
+        self.showing_temperature = False
+        self.showing_alert = False
+        self.showing_reminder = True
+        if not hasattr(self, 'reminder_opacity') or not self.reminder_opacity:
+            self.reminder_opacity = QGraphicsOpacityEffect(self.weather_reminder_text)
+            self.weather_reminder_text.setGraphicsEffect(self.reminder_opacity)
+        if not hasattr(self, 'reminder_icon_opacity') or not self.reminder_icon_opacity:
+            self.reminder_icon_opacity = QGraphicsOpacityEffect(self.reminder_icon)
+            self.reminder_icon.setGraphicsEffect(self.reminder_icon_opacity)
+        self._display_current_reminder()
+        reminder_text_fade_in = QPropertyAnimation(self.reminder_opacity, b'opacity')
+        reminder_icon_fade_in = QPropertyAnimation(self.reminder_icon_opacity, b'opacity')
+        self._setup_animation(reminder_text_fade_in, 0.0, 1.0)
+        self._setup_animation(reminder_icon_fade_in, 0.0, 1.0)
+        fade_in_group = QParallelAnimationGroup(self)
+        fade_in_group.addAnimation(reminder_text_fade_in)
+        fade_in_group.addAnimation(reminder_icon_fade_in)
+        self.reminder_opacity.setOpacity(0.0)
+        self.reminder_icon_opacity.setOpacity(0.0)
+        self.weather_reminder_text.show()
+        self.reminder_icon.show()
+        fade_in_group.start()
+
     def _cycle_to_next_alert_with_animation(self) -> None:
-        """在预警之间切换的动画"""
+        """在多个预警之间循环切换的动画"""
+        if not self.current_alerts or self.current_alert_index >= len(self.current_alerts):
+            return
+        if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
+            self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+            self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+        if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
+            self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+            self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
         alert_text_fade_out = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
         alert_icon_fade_out = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
-        alert_text_fade_out.setDuration(400)
-        alert_icon_fade_out.setDuration(400)
-        alert_text_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
-        alert_icon_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
-        alert_text_fade_out.setStartValue(1.0)
-        alert_text_fade_out.setEndValue(0.0)
-        alert_icon_fade_out.setStartValue(1.0)
-        alert_icon_fade_out.setEndValue(0.0)
-        self.fade_out_group = QParallelAnimationGroup(self)
-        self.fade_out_group.addAnimation(alert_text_fade_out)
-        self.fade_out_group.addAnimation(alert_icon_fade_out)
-        
-        def _switch_and_fade_in():
+        self._setup_animation(alert_text_fade_out, 1.0, 0.0, 300)
+        self._setup_animation(alert_icon_fade_out, 1.0, 0.0, 300)
+        fade_out_group = QParallelAnimationGroup(self)
+        fade_out_group.addAnimation(alert_text_fade_out)
+        fade_out_group.addAnimation(alert_icon_fade_out)
+        def _start_next_alert_fade_in():
             self._display_current_alert()
             alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
             alert_icon_fade_in = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
-            alert_text_fade_in.setDuration(400)
-            alert_icon_fade_in.setDuration(400)
-            alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-            alert_icon_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-            alert_text_fade_in.setStartValue(0.0)
-            alert_text_fade_in.setEndValue(1.0)
-            alert_icon_fade_in.setStartValue(0.0)
-            alert_icon_fade_in.setEndValue(1.0)
-            self.fade_in_group = QParallelAnimationGroup(self)
-            self.fade_in_group.addAnimation(alert_text_fade_in)
-            self.fade_in_group.addAnimation(alert_icon_fade_in)
-            self.fade_in_group.start()
-            if hasattr(self, 'weather_info_timer'):
-                self.weather_info_timer.start(3000)
-        try: 
-            self.fade_out_group.finished.disconnect()
-        except TypeError: 
+            self._setup_animation(alert_text_fade_in, 0.0, 1.0, 300)
+            self._setup_animation(alert_icon_fade_in, 0.0, 1.0, 300)
+            fade_in_group = QParallelAnimationGroup(self)
+            fade_in_group.addAnimation(alert_text_fade_in)
+            fade_in_group.addAnimation(alert_icon_fade_in)
+            self.weather_alert_opacity.setOpacity(0.0)
+            self.alert_icon_opacity.setOpacity(0.0)
+            fade_in_group.start()
+        try:
+            fade_out_group.finished.disconnect()
+        except TypeError:
             pass
-        self.fade_out_group.finished.connect(_switch_and_fade_in)
-        self.fade_out_group.start()
+        fade_out_group.finished.connect(_start_next_alert_fade_in)
+        fade_out_group.start()
+
+    def _cycle_to_next_reminder_with_animation(self) -> None:
+        """提醒循环切换动画"""
+        if not self.current_reminders or self.current_reminder_index >= len(self.current_reminders):
+            return
+        if not hasattr(self, 'reminder_opacity') or not self.reminder_opacity:
+            self.reminder_opacity = QGraphicsOpacityEffect(self.weather_reminder_text)
+            self.weather_reminder_text.setGraphicsEffect(self.reminder_opacity)
+        if not hasattr(self, 'reminder_icon_opacity') or not self.reminder_icon_opacity:
+            self.reminder_icon_opacity = QGraphicsOpacityEffect(self.reminder_icon)
+            self.reminder_icon.setGraphicsEffect(self.reminder_icon_opacity)
+        reminder_text_fade_out = QPropertyAnimation(self.reminder_opacity, b'opacity')
+        reminder_icon_fade_out = QPropertyAnimation(self.reminder_icon_opacity, b'opacity')
+        self._setup_animation(reminder_text_fade_out, 1.0, 0.0, 300)
+        self._setup_animation(reminder_icon_fade_out, 1.0, 0.0, 300)
+        fade_out_group = QParallelAnimationGroup(self)
+        fade_out_group.addAnimation(reminder_text_fade_out)
+        fade_out_group.addAnimation(reminder_icon_fade_out)
+        
+        def _start_next_reminder_fade_in():
+            # 下一个提醒
+            self._display_current_reminder()
+            reminder_text_fade_in = QPropertyAnimation(self.reminder_opacity, b'opacity')
+            reminder_icon_fade_in = QPropertyAnimation(self.reminder_icon_opacity, b'opacity')
+            self._setup_animation(reminder_text_fade_in, 0.0, 1.0, 300)
+            self._setup_animation(reminder_icon_fade_in, 0.0, 1.0, 300)
+            fade_in_group = QParallelAnimationGroup(self)
+            fade_in_group.addAnimation(reminder_text_fade_in)
+            fade_in_group.addAnimation(reminder_icon_fade_in)
+            self.reminder_opacity.setOpacity(0.0)
+            self.reminder_icon_opacity.setOpacity(0.0)
+            fade_in_group.start()
+        try:
+            fade_out_group.finished.disconnect()
+        except TypeError:
+            pass
+        fade_out_group.finished.connect(_start_next_reminder_fade_in)
+        fade_out_group.start()
+
+    def _hide_reminder(self) -> None:
+        """隐藏提醒控件"""
+        self.weather_reminder_text.hide()
+        self.reminder_icon.hide()
+        self.showing_reminder = False
+
+    def _hide_temperature(self) -> None:
+        """隐藏温度控件"""
+        self.weather_icon.hide()
+        self.temperature.hide()
+        self.showing_temperature = False
+    
+    def _hide_alert(self) -> None:
+        """隐藏预警控件"""
+        self.weather_alert_text.hide()
+        self.alert_icon.hide()
+        self.showing_alert = False
     
     def _display_current_alert(self) -> None:
         """显示当前索引的预警信息"""
@@ -2323,55 +2739,72 @@ class DesktopWidget(QWidget):  # 主要小组件
         if self.current_alert_index >= len(self.current_alerts):
             self.current_alert_index = 0
         current_alert = self.current_alerts[self.current_alert_index]
-        alert_text = self._simplify_alert_text(current_alert.get('title', self.tr('预警')))
-        font = self.weather_alert_text.font()
-        if len(alert_text) <= 4:
-            font.setPointSize(14)
-        elif len(alert_text) <= 8:
-            font.setPointSize(12)
+
+        alert_title = db.simplify_alert_text(current_alert.get('title'))
+        if len(alert_title) > 6:
+            alert_text = alert_title  # 极端情况去除预警二字
         else:
+            alert_text = alert_title + '预警'
+        char_count = len(alert_text)
+        font = self.weather_alert_text.font()
+        if char_count <= 4:
+            font.setPointSize(14)
+            self.weather_alert_text.setFixedWidth(76)
+        elif char_count == 5:
+            font.setPointSize(13)
+            self.weather_alert_text.setFixedWidth(85)
+        elif char_count == 6:
+            font.setPointSize(12)
+            self.weather_alert_text.setFixedWidth(95)
+        elif char_count == 7:
+            font.setPointSize(11)
+            self.weather_alert_text.setFixedWidth(105)
+        elif char_count == 8:
             font.setPointSize(10)
+            self.weather_alert_text.setFixedWidth(115)
+        else:
+            font.setPointSize(9)
+            self.weather_alert_text.setFixedWidth(min(125, 76 + char_count * 8))
         self.weather_alert_text.setFont(font)
         self.weather_alert_text.setText(alert_text)
         self.weather_alert_text.setAlignment(Qt.AlignCenter)
         severity = current_alert.get('severity', 'unknown')
         if hasattr(self, 'alert_icon'):
-            icon_path = self._get_alert_icon_by_severity(severity)
-            if icon_path:
-                self.alert_icon.setIcon(QIcon(icon_path))
-    
-    def _simplify_alert_text(self, text: str) -> str:
-        """简化预警文本"""
-        if not text:
-            return self.tr('预警')
-        match = re.search(r'(发布|升级为)(\w+)(蓝色|黄色|橙色|红色)预警', text)
-        if match:
-            return self.tr("{data}预警").format(data=match.group(2))
-        return '未知预警'
-
-    def _get_alert_icon_by_severity(self, severity: Union[str, int]) -> str:
-        """根据预警等级获取对应图标"""
-        severity_color_map = {
-            '1': 'blue',
-            '2': 'yellow', 
-            '3': 'orange',
-            '4': 'red'
-        }
-        severity_str = str(severity) if severity else '2'
-        color = severity_color_map.get(severity_str, 'yellow')
-        return get_alert_image(color)
+            icon_path = db.get_alert_icon_by_severity(severity)
+            if icon_path and os.path.exists(icon_path):
+                try:
+                    icon = QIcon(icon_path)
+                    if not icon.isNull():
+                        self.alert_icon.setIcon(icon)
+                    else:
+                        logger.warning(f'无法创建图标对象: {icon_path}')
+                except Exception as e:
+                    logger.error(f'设置预警图标失败: {e}')
+            else:
+                logger.warning(f'预警图标文件不存在: {icon_path}')
 
     def _reset_weather_alert_state(self) -> None:
-        """重置天气预警显示状态"""
-        for timer_name in ['weather_alert_timer', 'weather_info_timer']:
+        """重置天气预警、提醒显示状态"""
+        for timer_name in ['weather_alert_timer']:
             timer = getattr(self, timer_name, None)
             if timer:
                 timer.stop()
         self.showing_temperature = True
+        self.showing_alert = False
+        self.showing_reminder = False
+        
         self.current_alerts = getattr(self, 'current_alerts', [])
         self.current_alerts.clear()
         self.current_alert_index = 0
+
+        self.current_reminders = []
+        self.current_reminder_index = 0
+
         for element_name in ['weather_alert_text', 'alert_icon']:
+            element = getattr(self, element_name, None)
+            if element:
+                element.hide()
+        for element_name in ['weather_icon', 'temperature', 'weather_reminder_text', 'reminder_icon']:
             element = getattr(self, element_name, None)
             if element:
                 element.hide()
@@ -2381,6 +2814,58 @@ class DesktopWidget(QWidget):  # 主要小组件
                 element.show()
                 if hasattr(element, 'graphicsEffect') and element.graphicsEffect():
                     element.setGraphicsEffect(None)
+
+    def _display_current_reminder(self) -> None:
+        """显示当前索引的提醒信息"""
+        if not self.current_reminders or self.current_reminder_index >= len(self.current_reminders):
+            return
+        reminder = self.current_reminders[self.current_reminder_index]
+        # 提醒文本
+        self.weather_reminder_text.setText(reminder['title'])
+        # 调整字号
+        char_count = len(reminder['title'])
+        if char_count <= 5:
+            font_size = 14
+        elif char_count <= 10:
+            font_size = 13
+        elif char_count <= 12:
+            font_size = 12
+        else:
+            font_size = 11
+        font = self.weather_reminder_text.font()
+        font.setPointSize(font_size)
+        self.weather_reminder_text.setFont(font)
+
+        # 设置图标, 布局
+        content_layout = self.findChild(QHBoxLayout, 'horizontalLayout_2')
+        if char_count <= 6:
+            if content_layout.indexOf(self.reminder_icon) == -1:
+                text_index = content_layout.indexOf(self.weather_reminder_text)
+                if text_index != -1:
+                    content_layout.insertWidget(text_index, self.reminder_icon)
+                else:
+                    content_layout.addWidget(self.reminder_icon)
+            try:
+                icon_path = f"{base_directory}/img/weather/reminders/{reminder['icon']}.svg"
+                if os.path.exists(icon_path):
+                    self.reminder_icon.setIcon(icon_path)
+                    self.reminder_icon.show()
+                else:
+                    logger.warning(f'天气提醒图标不存在: {icon_path}')
+                    self.reminder_icon.hide()
+            except Exception as e:
+                logger.warning(f'设置天气提醒图标失败: {e}')
+                self.reminder_icon.hide()
+
+            if char_count == 6:
+                self.weather_reminder_text.setFixedWidth(102)
+            else:
+                self.weather_reminder_text.setFixedWidth(96)
+        else:
+            if content_layout.indexOf(self.reminder_icon) != -1:
+                content_layout.removeWidget(self.reminder_icon)
+                self.reminder_icon.hide()
+            self.weather_reminder_text.setFixedWidth(138)
 
     def detect_theme_changed(self) -> None:
         theme_ = config_center.read_conf('General', 'theme')
@@ -2402,17 +2887,30 @@ class DesktopWidget(QWidget):  # 主要小组件
             weather_data_temp = weather_data
             self._reset_weather_alert_state()
             try:
-                unified_alert_data = get_unified_weather_alerts(original_weather_data)
-                self.current_alerts = unified_alert_data.get('all_alerts', [])
-                self.current_alert_index = 0
-                logger.debug(f'获取到 {len(self.current_alerts)} 个天气预警')
-                if self.current_alerts:
-                    for i, alert in enumerate(self.current_alerts):
-                        logger.debug(f'预警 {i+1}: {alert.get("title", "未知")}')
-            except Exception as e:
-                logger.warning(f'获取预警数据失败：{e}')
+                # 更新数据
+                weather_manager.current_weather_data = original_weather_data
+                # 初始化预警和提醒数据
                 self.current_alerts = []
                 self.current_alert_index = 0
+                self.current_reminders = []
+                self.current_reminder_index = 0
+                if hasattr(self, 'reminder_thread') and self.reminder_thread.isRunning():
+                    self.reminder_thread.stop()
+                    self.reminder_thread.wait(1000)  # 等待线程结束
+                
+                if not hasattr(self, 'reminder_thread') or not self.reminder_thread.isRunning():
+                    from weather import WeatherReminderThread
+                    self.reminder_thread = WeatherReminderThread(weather_manager, original_weather_data)
+                    self.reminder_thread.reminders_ready.connect(self._on_reminders_ready)
+                    self.reminder_thread.alerts_ready.connect(self._on_alerts_ready)
+                    self.reminder_thread.start()
+
+            except Exception as e:
+                logger.warning(f'初始化预警和提醒数据失败：{e}')
+                self.current_alerts = []
+                self.current_alert_index = 0
+                self.current_reminders = []
+                self.current_reminder_index = 0
 
             weather_name = db.get_weather_by_code(db.get_weather_data('icon', weather_data))
             temp_data = db.get_weather_data('temp', weather_data)
@@ -2426,29 +2924,20 @@ class DesktopWidget(QWidget):  # 主要小组件
                     QPixmap(db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data)))
                 )
                 self.alert_icon.hide()
-                if self.current_alerts and len(self.current_alerts) > 0:
-                    self.weather_alert_text.setFixedWidth(80)
-                    self.weather_alert_text.setFixedHeight(40)
-                    self._display_current_alert()
-                    if not hasattr(self, 'weather_alert_timer') or not self.weather_alert_timer:
-                        self.weather_alert_timer = QTimer(self)
-                        self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
-                    self.weather_alert_timer.start(6000)  # 6秒切换一次
-                    if not hasattr(self, 'weather_info_timer') or not self.weather_info_timer:
-                        self.weather_info_timer = QTimer(self)
-                        self.weather_info_timer.timeout.connect(self.toggle_weather_alert)
-                        self.weather_info_timer.setSingleShot(True)
-                else:
-                    self.weather_alert_text.hide()
-                    self.alert_icon.hide()
+                if settings and hasattr(settings, '_on_weather_data_ready'):
+                    settings._on_weather_data_ready(original_weather_data)
 
                 temp_data = db.get_weather_data('temp', weather_data)
                 if temp_data and temp_data.lower() != 'none':
                     self.temperature.setText(temp_data)
                 else:
                     self.temperature.setText('--°')
-                current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · "
-                                     f"{weather_name}")
+                city_name = db.search_by_num(config_center.read_conf('Weather', 'city'))
+                if city_name != 'coordinates':
+                    current_city.setText(f"{city_name} · "
+                                        f"{weather_name}")
+                else:
+                    current_city.setText(f'{weather_name}')
                 path = db.get_weather_stylesheet(db.get_weather_data('icon', weather_data)).replace('\\', '/')
                 update_stylesheet = re.sub(
                     r'border-image: url\([^)]*\);',
@@ -2466,9 +2955,20 @@ class DesktopWidget(QWidget):  # 主要小组件
                     self.alert_icon.hide()
                     self.weather_alert_text.hide()
                     self.temperature.setText('--°')
+                    self.current_alerts = []
+                    self.current_alert_index = 0
+                    self.current_reminders = []
+                    self.current_reminder_index = 0
+                    if hasattr(self, 'weather_alert_timer') and self.weather_alert_timer:
+                        self.weather_alert_timer.stop()
+                        self._reset_weather_alert_state()
                     current_city = self.findChild(QLabel, 'current_city')
                     if current_city:
-                        current_city.setText(self.tr("{city} · 未知").format(city=db.search_by_num(config_center.read_conf('Weather', 'city'))))
+                        city_name = city=db.search_by_num(config_center.read_conf('Weather', 'city'))
+                        if city_name != 'coordinates':
+                            current_city.setText(self.tr("{city} · 未知").format(city=city_name))
+                        else:
+                            current_city.setText(self.tr("未知"))
                     if hasattr(self, 'backgnd'):
                         path = db.get_weather_stylesheet('99').replace('\\', '/')
                         update_stylesheet = re.sub(
@@ -2480,13 +2980,29 @@ class DesktopWidget(QWidget):  # 主要小组件
             except Exception as e:
                 logger.error(f'天气图标设置失败：{e}')
 
+    def update_weather_timer_interval(self, minutes: int) -> None:
+        """更新天气定时器间隔"""
+        try:
+            if hasattr(self, 'weather_timer') and self.weather_timer:
+                self.weather_timer.stop()
+                new_interval = minutes * 60 * 1000
+                self.weather_timer.setInterval(new_interval)
+                self.weather_timer.start()
+                # logger.debug(f'天气定时器间隔已更新为 {minutes} 分钟')
+                if settings and hasattr(settings, 'weather_refresh_picker'):
+                    if settings.weather_refresh_picker:
+                        settings.weather_refresh_picker.setValue(minutes)
+        except Exception as e:
+            logger.error(f'更新天气定时器间隔失败: {e}')
+
     def open_extra_menu(self) -> None:
         global ex_menu
         if ex_menu is None or not ex_menu.isVisible():
             ex_menu = ExtraMenu()
+            ex_menu.main_window = self
             ex_menu.show()
             ex_menu.destroyed.connect(self.cleanup_extra_menu)
-            logger.info('打开“额外选项”')
+            logger.info('打开"额外选项"')
         else:
             ex_menu.raise_()
             ex_menu.activateWindow()
@@ -2615,8 +3131,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(525)  # 持续时间
         # 获取当前窗口的宽度和高度，确保动画过程中保持一致
+        margin = max(0, int(config_center.read_conf('General', 'margin')))
         self.animation.setEndValue(
-        QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
+        QRect(self.x(), margin, self.width(), self.height()))
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)  # 设置动画效果
         self.animation.finished.connect(self.clear_animation)
 
@@ -2625,11 +3142,13 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         self.animation.start()
 
-    def widget_transition(self, pos_x: int, width: int, height: int, opacity: float = 1) -> None:  # 窗口形变
+    def widget_transition(self, pos_x: int, width: int, height: int, opacity: float = 1, pos_y: int = None) -> None:  # 窗口形变
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(525)  # 持续时间
         self.animation.setStartValue(QRect(self.x(), self.y(), self.width(), self.height()))
-        self.animation.setEndValue(QRect(pos_x, self.y(), width, height))
+        if pos_y is None:
+            pos_y = max(0, int(config_center.read_conf('General', 'margin')))
+        self.animation.setEndValue(QRect(pos_x, pos_y, width, height))
         self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)  # 设置动画效果
         self.animation.start()
 
@@ -2646,8 +3165,6 @@ class DesktopWidget(QWidget):  # 主要小组件
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.RightButton:
             return  # 右键不执行
-        if config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
-            return  # 置底不执行
         if config_center.read_conf('General', 'hide') == '0':  # 置顶
             if mgr.state:
                 mgr.decide_to_hide()
@@ -2872,12 +3389,7 @@ if __name__ == '__main__':
     scale_factor = float(config_center.read_conf('General', 'scale'))
     os.environ['QT_SCALE_FACTOR'] = str(scale_factor)
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
-
-    app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-
-    global_i18n_manager = I18nManager()
-    global_i18n_manager.init_from_config()
     
     logger.debug(f"i18n加载,界面: {global_i18n_manager.get_current_language_view_name()},组件: {global_i18n_manager.get_current_language_widgets_name()}")
     menu.global_i18n_manager = global_i18n_manager
@@ -2943,9 +3455,17 @@ if __name__ == '__main__':
     get_current_lesson_name()
     get_next_lessons()
 
-    # 如果在全屏或最大化模式下启动，首先折叠主组件后显示浮动窗口动画。
-    if check_windows_maximize() or check_fullscreen():
-        mgr.decide_to_hide()  # 折叠动画,其实这里可用`mgr.full_hide_windows()`但是播放动画似乎更好()
+    hide_mode = config_center.read_conf('General', 'hide')
+    should_hide = False
+    if hide_mode == '1':  # 上课自动隐藏
+        should_hide = current_state == 1  # 判断是否为上课状态
+    elif hide_mode == '2':  # 全屏自动隐藏
+        should_hide = check_windows_maximize() or check_fullscreen()  # 检查是否全屏
+    elif hide_mode == '3':  # 灵活隐藏
+        should_hide = current_state == 1
+
+    if should_hide:
+        mgr.decide_to_hide()
 
     if current_state == 1:
         setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")

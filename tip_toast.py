@@ -1,8 +1,8 @@
-import sys
-
 import os
+import sys
 from collections import defaultdict
-from typing import Optional, Union, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any
+
 from PyQt5 import uic
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QPoint, pyqtProperty, QThread
 from PyQt5.QtGui import QColor, QPainter, QBrush, QPixmap
@@ -11,18 +11,11 @@ from loguru import logger
 from qfluentwidgets import setThemeColor
 
 import conf
-from conf import base_directory
 import list_
-from file import config_center
+from file import base_directory, config_center
 from play_audio import PlayAudio
 from generate_speech import get_tts_service
-import platform
 
-# 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
 prepare_class = config_center.read_conf('Audio', 'prepare_class')
 attend_class = config_center.read_conf('Audio', 'attend_class')
@@ -37,7 +30,6 @@ normal_color = '#56CFD8'
 window_list = []  # 窗口列表
 active_windows = []
 tts_service = None # TTS实例
-
 
 class tip_toast(QWidget):
     def __init__(self, pos: Tuple[int, int], width: int, state: int = 1, lesson_name: Optional[str] = None, title: Optional[str] = None, subtitle: Optional[str] = None, content: Optional[str] = None, icon: Optional[str] = None, duration: int = 2000) -> None:
@@ -62,7 +54,7 @@ class tip_toast(QWidget):
         if config_center.read_conf('Toast', 'pin_on_top') == '1':
             self.setWindowFlags(
                 Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint |
-                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(
@@ -286,21 +278,6 @@ class tip_toast(QWidget):
         self.opacity_animation_close.finished.connect(self.close)
 
     def closeEvent(self, event) -> None:
-        if self.audio_thread and self.audio_thread.isRunning():
-            try:
-                self.audio_thread.quit()
-                self.audio_thread.wait(500)
-            except Exception as e:
-                logger.warning(f"关闭窗口时停止提示音线程出错: {e}")
-
-        try:
-            from generate_speech import is_tts_playing, stop_tts
-            if is_tts_playing():
-                stop_tts()
-                logger.info("窗口关闭时已停止TTS播放")
-        except (ImportError, Exception) as e:
-            logger.warning(f"关闭窗口时停止TTS播放出错: {e}")
-
         if self in active_windows:
             active_windows.remove(self)
         global window_list
@@ -315,7 +292,12 @@ class tip_toast(QWidget):
             if self.audio_thread and self.audio_thread.isRunning():
                 self.audio_thread.quit()
                 self.audio_thread.wait()
-            self.audio_thread = PlayAudio(str(file_path))
+            self.audio_thread = PlayAudio(
+                file_path=str(file_path),
+                volume=1.0,
+                cleanup_callback=None,
+                blocking=False
+            )
             self.audio_thread.start()
             self.audio_thread.setPriority(QThread.Priority.HighestPriority)  # 设置优先级
         except Exception as e:
@@ -329,12 +311,12 @@ class wave_Effect(QWidget):
         if config_center.read_conf('Toast', 'pin_on_top') == '1':
             self.setWindowFlags(
                 Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint |
-                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(
                 Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.FramelessWindowHint |
-                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -519,7 +501,7 @@ def push_notification(state: int = 1, lesson_name: str = '', title: Optional[str
 
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    from i18n_manager import app
     main(
         state=4,  # 自定义通知
         title='天气预报',
