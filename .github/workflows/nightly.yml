@@ -1,8 +1,6 @@
 name: Nightly-Builds
 
 on:
-  schedule:
-    - cron: "55 15 * * *" # UTC+8 23:55
   workflow_dispatch:
     inputs:
       force_build:
