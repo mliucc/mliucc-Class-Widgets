@@ -23,7 +23,7 @@ import list_
 from basic_dirs import CW_HOME
 from file import config_center
 from generate_speech import get_tts_service
-from play_audio import PlayAudio
+from play_audio import PlayAudio, stop_audio
 
 prepare_class = config_center.read_conf('Audio', 'prepare_class')
 attend_class = config_center.read_conf('Audio', 'attend_class')
@@ -373,6 +373,7 @@ class tip_toast(QWidget):
 
     def playsound(self, filename: str, volume: Optional[int] = None) -> None:
         try:
+            stop_audio()
             file_path = CW_HOME / "audio" / filename
             if self.audio_thread and self.audio_thread.isRunning():
                 self.audio_thread.quit()
