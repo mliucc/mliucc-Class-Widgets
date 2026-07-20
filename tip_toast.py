@@ -186,7 +186,7 @@ class tip_toast(QWidget):
             title_label.setText(title)
             subtitle_label.setText(subtitle)
             lesson.setText(content)
-            sound_to_play = prepare_class
+            sound_to_play = config_center.read_conf("Audio", "other")
             format_values['title'] = title
             format_values['content'] = content
             tts_text = config_center.read_conf('TTS', 'otherwise').format_map(format_values)

@@ -111,7 +111,7 @@ class CustomNotificationManager:
             1: config_center.read_conf("Audio", "attend_class"),
             2: config_center.read_conf("Audio", "finish_class"),
             3: config_center.read_conf("Audio", "prepare_class"),
-            4: config_center.read_conf("Audio", "prepare_class"),
+            4: config_center.read_conf("Audio", "other"),
         }
 
         for item in self._notifications:
