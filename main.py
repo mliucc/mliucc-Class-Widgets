@@ -518,6 +518,22 @@ def get_countdown(toast: bool = False) -> Optional[Tuple[str, str, int]]:  # 重
                     add_time = int(item_time)
                     c_time += dt.timedelta(minutes=add_time)
 
+                    # 课间结束时检查下一节课的预备铃
+                    if (
+                        config_center.read_conf('Toast', 'prepare_minutes') != '0'
+                        and toast
+                        and not current_state
+                        and isbreak
+                        and current_dt == c_time - dt.timedelta(
+                            minutes=int(config_center.read_conf('Toast', 'prepare_minutes'))
+                        )
+                        and current_dt != last_notify_time
+                        and next_lessons
+                    ):
+                        if can_send_notification(3, next_lessons[0]):
+                            notification.push_notification(3, next_lessons[0])
+                            last_notify_time = current_dt
+
                     if got_return_data:
                         break
 
