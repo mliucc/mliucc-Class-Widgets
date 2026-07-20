@@ -521,7 +521,7 @@ def get_countdown(toast: bool = False) -> Optional[Tuple[str, str, int]]:  # 重
                     if got_return_data:
                         break
 
-                    if c_time >= current_dt:
+                    if c_time > current_dt:  # 用 > 而非 >=，确保当前项目刚好结束时继续检查下一个项目的通知
                         # 根据所在时间段使用不同标语
                         # 返回倒计时、进度条
                         time_diff = c_time - current_dt
