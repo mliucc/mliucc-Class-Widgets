@@ -1,7 +1,7 @@
 import json
+import os
 import uuid
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
 from typing import Dict, List, Optional
 
 from loguru import logger
@@ -30,6 +30,7 @@ class CustomNotificationManager:
         self._file_path = CONFIG_HOME / "custom_notifications.json"
         self._notifications: List[CustomNotification] = []
         self._sent_today: Dict[str, str] = {}
+        self._last_mtime: float = 0
         self._load()
 
     def _load(self) -> None:
@@ -39,13 +40,26 @@ class CustomNotificationManager:
             logger.info("已创建空的 custom_notifications.json")
             return
         try:
+            self._last_mtime = os.path.getmtime(self._file_path)
             with open(self._file_path, encoding="utf-8") as f:
                 data = json.load(f)
-            self._notifications = [CustomNotification(**item) for item in data.get("notifications", [])]
+            raw = data.get("notifications", [])
+            self._notifications = []
+            for item in raw:
+                if not item.get("id"):
+                    item["id"] = str(uuid.uuid4())
+                self._notifications.append(CustomNotification(**item))
             logger.info(f"已加载 {len(self._notifications)} 条自定义通知")
         except Exception as e:
             logger.error(f"加载自定义通知失败: {e}")
             self._notifications = []
+
+    def _auto_reload(self) -> None:
+        try:
+            if self._file_path.exists() and os.path.getmtime(self._file_path) != self._last_mtime:
+                self._load()
+        except Exception:
+            pass
 
     def _save(self) -> None:
         try:
@@ -83,6 +97,8 @@ class CustomNotificationManager:
         self._load()
 
     def check_and_notify(self) -> None:
+        self._auto_reload()
+
         now = TimeManagerFactory.get_instance().get_current_time()
         today_date = now.strftime("%Y-%m-%d")
         weekday = now.weekday()
