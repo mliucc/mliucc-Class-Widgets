@@ -15,7 +15,7 @@ from utils import TimeManagerFactory
 @dataclass
 class CustomNotification:
     id: str
-    enabled: bool = True
+    enabled: int = 1
     name: str = ""
     days_of_week: List[int] = field(default_factory=list)
     time: str = ""
@@ -48,6 +48,8 @@ class CustomNotificationManager:
             for item in raw:
                 if not item.get("id"):
                     item["id"] = str(uuid.uuid4())
+                if isinstance(item.get("enabled"), bool):
+                    item["enabled"] = 1 if item["enabled"] else 0
                 self._notifications.append(CustomNotification(**item))
             logger.info(f"已加载 {len(self._notifications)} 条自定义通知")
         except Exception as e:
@@ -115,7 +117,7 @@ class CustomNotificationManager:
         }
 
         for item in self._notifications:
-            if not item.enabled:
+            if item.enabled == 0:
                 continue
             if weekday not in item.days_of_week:
                 continue
@@ -142,6 +144,11 @@ class CustomNotificationManager:
 
             self._sent_today[item.id] = today_date
             logger.info(f"自定义通知触发: {item.name} (state={item.state}, time={time_str})")
+
+            if item.enabled == 2:
+                item.enabled = 0
+                self._save()
+                logger.info(f"一次性通知 {item.name} 已自动关闭")
 
     def _clean_sent_cache(self, today_date: str) -> None:
         expired = [k for k, v in self._sent_today.items() if v != today_date]
