@@ -58,6 +58,7 @@ class tip_toast(QWidget):
         content: Optional[str] = None,
         icon: Optional[str] = None,
         duration: int = 2000,
+        audio_file: str = "",
     ) -> None:
         super().__init__()
         for w in active_windows[:]:
@@ -297,6 +298,9 @@ class tip_toast(QWidget):
         self.opacity_animation.setEndValue(1)
         self.opacity_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
+        if audio_file:
+            sound_to_play = audio_file
+
         if sound_to_play:
             self.playsound(sound_to_play)
 
@@ -488,6 +492,7 @@ def main(
     content: str = '这是一条通知示例',
     icon: Optional[str] = None,
     duration: int = 2000,
+    audio_file: str = "",
 ) -> None:  # 0:下课铃声 1:上课铃声 2:放学铃声 3:预备铃 4:其他
     if detect_enable_toast(state):
         return
@@ -536,7 +541,7 @@ def main(
     start_y = int(margin_base * dpr)
 
     if state != 4:
-        window = tip_toast((start_x, start_y), total_width, state, lesson_name, duration=duration)
+        window = tip_toast((start_x, start_y), total_width, state, lesson_name, duration=duration, audio_file=audio_file)
     else:
         window = tip_toast(
             (start_x, start_y),
@@ -548,6 +553,7 @@ def main(
             content,
             icon,
             duration=duration,
+            audio_file=audio_file,
         )
 
     window.show()
@@ -575,6 +581,7 @@ def push_notification(
     content: Optional[str] = None,
     icon: Optional[str] = None,
     duration: int = 2000,
+    audio_file: str = "",
 ) -> Dict[str, Any]:  # 推送通知
     global pushed_notification, notification_contents
     pushed_notification = True
@@ -585,7 +592,7 @@ def push_notification(
         "subtitle": subtitle,
         "content": content,
     }
-    main(state, lesson_name, title, subtitle, content, icon, duration)
+    main(state, lesson_name, title, subtitle, content, icon, duration, audio_file=audio_file)
     return notification_contents
 
 

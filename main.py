@@ -96,6 +96,7 @@ from generate_speech import generate_speech_sync
 from i18n_manager import app, global_i18n_manager
 from menu import open_plaza
 from network_thread import check_update, getCity
+from custom_notification import custom_notification_manager
 from plugin import p_loader
 from tip_toast import active_windows
 from utils import DarkModeWatcher, TimeManagerFactory, restart, stop, update_timer
@@ -3794,6 +3795,7 @@ def init() -> None:
 
     update_timer.add_callback(mgr.update_widgets, interval=0.25)
     update_timer.add_callback(p_loader.update_plugins, interval=1)
+    update_timer.add_callback(custom_notification_manager.check_and_notify, interval=1)
     update_timer.start()
 
     version = config_center.read_conf("Version", "version")
