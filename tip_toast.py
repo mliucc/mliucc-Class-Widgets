@@ -59,6 +59,7 @@ class tip_toast(QWidget):
         icon: Optional[str] = None,
         duration: int = 2000,
         audio_file: str = "",
+        volume: Optional[int] = None,
     ) -> None:
         super().__init__()
         for w in active_windows[:]:
@@ -301,8 +302,20 @@ class tip_toast(QWidget):
         if audio_file:
             sound_to_play = audio_file
 
+        if not audio_file and lesson_name:
+            try:
+                from custom_notification import custom_notification_manager
+
+                override = custom_notification_manager.get_subject_audio(lesson_name)
+                if override:
+                    sound_to_play = override.audio_file
+                    if volume is None and override.volume is not None:
+                        volume = override.volume
+            except ImportError:
+                pass
+
         if sound_to_play:
-            self.playsound(sound_to_play)
+            self.playsound(sound_to_play, volume)
 
         self.geometry_animation.start()
         self.opacity_animation.start()
@@ -358,15 +371,16 @@ class tip_toast(QWidget):
         self.deleteLater()
         event.ignore()
 
-    def playsound(self, filename: str) -> None:
+    def playsound(self, filename: str, volume: Optional[int] = None) -> None:
         try:
             file_path = CW_HOME / "audio" / filename
             if self.audio_thread and self.audio_thread.isRunning():
                 self.audio_thread.quit()
                 self.audio_thread.wait()
+            vol_float = volume / 100.0 if volume is not None else None
             self.audio_thread = PlayAudio(
                 file_path=str(file_path),
-                volume=None,  # 使用配置文件
+                volume=vol_float,
                 cleanup_callback=None,
                 blocking=False,
             )
@@ -493,6 +507,7 @@ def main(
     icon: Optional[str] = None,
     duration: int = 2000,
     audio_file: str = "",
+    volume: Optional[int] = None,
 ) -> None:  # 0:下课铃声 1:上课铃声 2:放学铃声 3:预备铃 4:其他
     if detect_enable_toast(state):
         return
@@ -541,7 +556,7 @@ def main(
     start_y = int(margin_base * dpr)
 
     if state != 4:
-        window = tip_toast((start_x, start_y), total_width, state, lesson_name, duration=duration, audio_file=audio_file)
+        window = tip_toast((start_x, start_y), total_width, state, lesson_name, duration=duration, audio_file=audio_file, volume=volume)
     else:
         window = tip_toast(
             (start_x, start_y),
@@ -554,6 +569,7 @@ def main(
             icon,
             duration=duration,
             audio_file=audio_file,
+            volume=volume,
         )
 
     window.show()
@@ -582,6 +598,7 @@ def push_notification(
     icon: Optional[str] = None,
     duration: int = 2000,
     audio_file: str = "",
+    volume: Optional[int] = None,
 ) -> Dict[str, Any]:  # 推送通知
     global pushed_notification, notification_contents
     pushed_notification = True
@@ -592,7 +609,7 @@ def push_notification(
         "subtitle": subtitle,
         "content": content,
     }
-    main(state, lesson_name, title, subtitle, content, icon, duration, audio_file=audio_file)
+    main(state, lesson_name, title, subtitle, content, icon, duration, audio_file=audio_file, volume=volume)
     return notification_contents
 
 

@@ -25,10 +25,18 @@ class CustomNotification:
     audio_file: str = ""
 
 
+@dataclass
+class SubjectAudioOverride:
+    subject: str = ""
+    audio_file: str = ""
+    volume: Optional[int] = None
+
+
 class CustomNotificationManager:
     def __init__(self) -> None:
         self._file_path = CONFIG_HOME / "custom_notifications.json"
         self._notifications: List[CustomNotification] = []
+        self._subject_overrides: List[SubjectAudioOverride] = []
         self._sent_today: Dict[str, str] = {}
         self._last_mtime: float = 0
         self._load()
@@ -51,10 +59,15 @@ class CustomNotificationManager:
                 if isinstance(item.get("enabled"), bool):
                     item["enabled"] = 1 if item["enabled"] else 0
                 self._notifications.append(CustomNotification(**item))
-            logger.info(f"已加载 {len(self._notifications)} 条自定义通知")
+
+            raw_ov = data.get("subject_audio_overrides", [])
+            self._subject_overrides = [SubjectAudioOverride(**s) for s in raw_ov]
+
+            logger.info(f"已加载 {len(self._notifications)} 条自定义通知, {len(self._subject_overrides)} 条科目音频覆盖")
         except Exception as e:
             logger.error(f"加载自定义通知失败: {e}")
             self._notifications = []
+            self._subject_overrides = []
 
     def _auto_reload(self) -> None:
         try:
@@ -67,7 +80,10 @@ class CustomNotificationManager:
         try:
             with open(self._file_path, "w", encoding="utf-8") as f:
                 json.dump(
-                    {"notifications": [asdict(n) for n in self._notifications]},
+                    {
+                        "subject_audio_overrides": [asdict(s) for s in self._subject_overrides],
+                        "notifications": [asdict(n) for n in self._notifications],
+                    },
                     f,
                     ensure_ascii=False,
                     indent=2,
@@ -97,6 +113,12 @@ class CustomNotificationManager:
 
     def reload(self) -> None:
         self._load()
+
+    def get_subject_audio(self, subject_name: str) -> Optional[SubjectAudioOverride]:
+        for s in self._subject_overrides:
+            if s.subject == subject_name:
+                return s
+        return None
 
     def check_and_notify(self) -> None:
         self._auto_reload()
