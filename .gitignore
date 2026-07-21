@@ -183,6 +183,9 @@ cython_debug/
 # macOS's shit:
 .DS_Store
 
+# OMRE review artifacts
+.omre/
+
 # Visual Studio
 /.vs
 /.vscode
