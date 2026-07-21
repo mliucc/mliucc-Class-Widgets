@@ -30,6 +30,7 @@ class SubjectAudioOverride:
     subject: str = ""
     audio_file: str = ""
     volume: Optional[int] = None
+    states: Optional[List[int]] = None
 
 
 class CustomNotificationManager:
@@ -114,10 +115,13 @@ class CustomNotificationManager:
     def reload(self) -> None:
         self._load()
 
-    def get_subject_audio(self, subject_name: str) -> Optional[SubjectAudioOverride]:
+    def get_subject_audio(self, subject_name: str, state: int = -1) -> Optional[SubjectAudioOverride]:
         for s in self._subject_overrides:
-            if s.subject == subject_name:
-                return s
+            if s.subject != subject_name:
+                continue
+            if not s.states or state not in s.states:
+                continue
+            return s
         return None
 
     def check_and_notify(self) -> None:
@@ -148,7 +152,12 @@ class CustomNotificationManager:
             if self._sent_today.get(item.id) == today_date:
                 continue
 
-            audio = item.audio_file or audio_defaults.get(item.state, "")
+            if item.audio_file == "default":
+                audio = audio_defaults.get(item.state, "")
+            elif item.audio_file:
+                audio = item.audio_file
+            else:
+                audio = ""
 
             if item.state == 4:
                 push_notification(

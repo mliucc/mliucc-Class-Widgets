@@ -58,7 +58,7 @@ class tip_toast(QWidget):
         content: Optional[str] = None,
         icon: Optional[str] = None,
         duration: int = 2000,
-        audio_file: str = "",
+        audio_file: Optional[str] = None,
         volume: Optional[int] = None,
     ) -> None:
         super().__init__()
@@ -299,16 +299,25 @@ class tip_toast(QWidget):
         self.opacity_animation.setEndValue(1)
         self.opacity_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
-        if audio_file:
-            sound_to_play = audio_file
-
-        if not audio_file and lesson_name:
+        if audio_file is not None:
+            if audio_file == "default":
+                pass
+            elif audio_file:
+                sound_to_play = audio_file
+            else:
+                sound_to_play = None
+        elif lesson_name:
             try:
                 from custom_notification import custom_notification_manager
 
-                override = custom_notification_manager.get_subject_audio(lesson_name)
+                override = custom_notification_manager.get_subject_audio(lesson_name, state)
                 if override:
-                    sound_to_play = override.audio_file
+                    if override.audio_file == "default":
+                        pass
+                    elif override.audio_file:
+                        sound_to_play = override.audio_file
+                    else:
+                        sound_to_play = None
                     if volume is None and override.volume is not None:
                         volume = override.volume
             except ImportError:
@@ -372,6 +381,8 @@ class tip_toast(QWidget):
         event.ignore()
 
     def playsound(self, filename: str, volume: Optional[int] = None) -> None:
+        if not filename:
+            return
         try:
             stop_audio()
             file_path = CW_HOME / "audio" / filename
@@ -507,7 +518,7 @@ def main(
     content: str = '这是一条通知示例',
     icon: Optional[str] = None,
     duration: int = 2000,
-    audio_file: str = "",
+    audio_file: Optional[str] = None,
     volume: Optional[int] = None,
 ) -> None:  # 0:下课铃声 1:上课铃声 2:放学铃声 3:预备铃 4:其他
     if detect_enable_toast(state):
@@ -598,7 +609,7 @@ def push_notification(
     content: Optional[str] = None,
     icon: Optional[str] = None,
     duration: int = 2000,
-    audio_file: str = "",
+    audio_file: Optional[str] = None,
     volume: Optional[int] = None,
 ) -> Dict[str, Any]:  # 推送通知
     global pushed_notification, notification_contents
