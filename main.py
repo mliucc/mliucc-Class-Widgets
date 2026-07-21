@@ -4057,8 +4057,8 @@ if __name__ == '__main__':
 
     # w = ErrorDialog()
     # w.exec()
-    if config_center.read_conf('Version', 'auto_check_update', '1') == '1':
-        check_update()
+    # if config_center.read_conf('Version', 'auto_check_update', '1') == '1':
+    #     check_update()
 
     splash_window.close()
 
