@@ -56,7 +56,7 @@ class CustomNotificationManager:
             raw = data.get("notifications", [])
             self._notifications = []
             for item in raw:
-                if not item.get("id"):
+                if not item.get("id") or item["id"] == "auto":
                     item["id"] = str(uuid.uuid4())
                 if isinstance(item.get("enabled"), bool):
                     item["enabled"] = 1 if item["enabled"] else 0
