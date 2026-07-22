@@ -22,6 +22,7 @@ class CustomNotification:
     state: int = 4
     title: str = ""
     subtitle: str = ""
+    duration: int = 2000
     audio_file: str = ""
 
 
@@ -173,6 +174,7 @@ class CustomNotificationManager:
                 title=item.title,
                 subtitle=item.subtitle,
                 content=lesson_name,
+                duration=item.duration,
                 audio_file=audio,
             )
 
