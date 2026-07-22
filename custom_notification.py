@@ -62,7 +62,10 @@ class CustomNotificationManager:
                 self._notifications.append(CustomNotification(**item))
 
             raw_ov = data.get("subject_audio_overrides", [])
-            self._subject_overrides = [SubjectAudioOverride(**s) for s in raw_ov]
+            self._subject_overrides = []
+            for s in raw_ov:
+                s["subject"] = s.get("subject", "").strip()
+                self._subject_overrides.append(SubjectAudioOverride(**s))
 
             logger.info(f"已加载 {len(self._notifications)} 条自定义通知, {len(self._subject_overrides)} 条科目音频覆盖")
         except Exception as e:
@@ -116,6 +119,7 @@ class CustomNotificationManager:
         self._load()
 
     def get_subject_audio(self, subject_name: str, state: int = -1) -> Optional[SubjectAudioOverride]:
+        subject_name = subject_name.strip()
         for s in self._subject_overrides:
             if s.subject != subject_name:
                 continue
