@@ -480,8 +480,8 @@ def get_countdown(toast: bool = False) -> Optional[Tuple[str, str, int]]:  # 重
                                 notification.push_notification(1, next_lessons[0])  # 上课
                                 last_notify_time = current_dt
                         elif next_lessons:  # 下课/放学
-                            if can_send_notification(0, next_lessons[0]):
-                                notification.push_notification(0, next_lessons[0])  # 下课
+                            if can_send_notification(0, current_lesson_name):
+                                notification.push_notification(0, current_lesson_name)  # 下课
                                 last_notify_time = current_dt
                         else:
                             after_school()
