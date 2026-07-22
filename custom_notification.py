@@ -163,10 +163,12 @@ class CustomNotificationManager:
                 audio = item.audio_file
             else:
                 audio = ""
+            logger.debug(f"自定义通知音频解析: {item.audio_file!r} → {audio!r}")
 
             lesson_name = item.name
             if not lesson_name and item.state in (1, 3) and next_lessons:
                 lesson_name = next_lessons[0]
+                logger.info(f"自定义通知自动补全课程名: {lesson_name}")
 
             push_notification(
                 state=item.state,
@@ -179,7 +181,13 @@ class CustomNotificationManager:
             )
 
             self._sent_today[item.id] = today_date
-            logger.info(f"自定义通知触发: {item.name} (state={item.state}, time={time_str})")
+            extras = []
+            if item.duration != 2000:
+                extras.append(f"duration={item.duration}")
+            if lesson_name != item.name:
+                extras.append(f"lesson_name={lesson_name}")
+            extras_str = f" ({', '.join(extras)})" if extras else ""
+            logger.info(f"自定义通知触发: {item.name} (state={item.state}, time={time_str}){extras_str}")
 
             if item.enabled == 2:
                 item.enabled = 0
