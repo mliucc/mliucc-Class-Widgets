@@ -301,10 +301,12 @@ class tip_toast(QWidget):
 
         if audio_file is not None:
             if audio_file == "default":
-                pass
+                logger.debug(f"保存默认音频: {sound_to_play}")
             elif audio_file:
+                logger.debug(f"使用指定音频: {audio_file}")
                 sound_to_play = audio_file
             else:
+                logger.debug("通知已静音")
                 sound_to_play = None
         elif lesson_name:
             try:
@@ -313,13 +315,16 @@ class tip_toast(QWidget):
                 override = custom_notification_manager.get_subject_audio(lesson_name, state)
                 if override:
                     if override.audio_file == "default":
-                        pass
+                        logger.debug(f"科目覆盖({lesson_name})使用默认音频")
                     elif override.audio_file:
+                        logger.debug(f"科目覆盖({lesson_name})使用音频: {override.audio_file}")
                         sound_to_play = override.audio_file
                     else:
+                        logger.debug(f"科目覆盖({lesson_name})已静音")
                         sound_to_play = None
                     if volume is None and override.volume is not None:
                         volume = override.volume
+                        logger.debug(f"科目覆盖({lesson_name})音量: {volume}")
             except ImportError:
                 pass
 
@@ -384,12 +389,15 @@ class tip_toast(QWidget):
         if not filename:
             return
         try:
+            logger.debug(f"停止正在播放的音频")
             stop_audio()
             file_path = CW_HOME / "audio" / filename
             if self.audio_thread and self.audio_thread.isRunning():
                 self.audio_thread.quit()
                 self.audio_thread.wait()
             vol_float = volume / 100.0 if volume is not None else None
+            if vol_float is not None:
+                logger.debug(f"播放音频({filename}) 音量: {volume}")
             self.audio_thread = PlayAudio(
                 file_path=str(file_path),
                 volume=vol_float,

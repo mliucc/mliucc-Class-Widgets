@@ -126,6 +126,7 @@ class CustomNotificationManager:
                 continue
             if not s.states or state not in s.states:
                 continue
+            logger.debug(f"科目音频覆盖匹配: {subject_name} (states={s.states})")
             return s
         return None
 
