@@ -128,7 +128,7 @@ class CustomNotificationManager:
             return s
         return None
 
-    def check_and_notify(self) -> None:
+    def check_and_notify(self, next_lessons: Optional[List[str]] = None) -> None:
         self._auto_reload()
 
         now = TimeManagerFactory.get_instance().get_current_time()
@@ -163,19 +163,18 @@ class CustomNotificationManager:
             else:
                 audio = ""
 
-            if item.state == 4:
-                push_notification(
-                    state=4,
-                    title=item.title,
-                    subtitle=item.subtitle,
-                    content=item.name,
-                    audio_file=audio,
-                )
-            else:
-                push_notification(
-                    state=item.state,
-                    audio_file=audio,
-                )
+            lesson_name = item.name
+            if not lesson_name and item.state in (1, 3) and next_lessons:
+                lesson_name = next_lessons[0]
+
+            push_notification(
+                state=item.state,
+                lesson_name=lesson_name,
+                title=item.title,
+                subtitle=item.subtitle,
+                content=lesson_name,
+                audio_file=audio,
+            )
 
             self._sent_today[item.id] = today_date
             logger.info(f"自定义通知触发: {item.name} (state={item.state}, time={time_str})")

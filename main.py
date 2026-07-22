@@ -3811,7 +3811,7 @@ def init() -> None:
 
     update_timer.add_callback(mgr.update_widgets, interval=0.25)
     update_timer.add_callback(p_loader.update_plugins, interval=1)
-    update_timer.add_callback(custom_notification_manager.check_and_notify, interval=1)
+    update_timer.add_callback(lambda: custom_notification_manager.check_and_notify(next_lessons), interval=1)
     update_timer.start()
 
     version = config_center.read_conf("Version", "version")
