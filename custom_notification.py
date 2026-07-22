@@ -134,7 +134,7 @@ class CustomNotificationManager:
         now = TimeManagerFactory.get_instance().get_current_time()
         today_date = now.strftime("%Y-%m-%d")
         weekday = now.weekday()
-        time_str = now.strftime("%H:%M")
+        time_str = now.strftime("%H:%M:%S")
 
         self._clean_sent_cache(today_date)
 
