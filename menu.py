@@ -1353,6 +1353,10 @@ class SettingsMenu(FluentWindow):
 
         if not p_loader.plugins_settings:  # 若插件设置为空
             p_loader.load_plugins()  # 加载插件设置
+            # load_plugins() 会重新构造插件实例，但不执行其 execute()。
+            # 若不在此处补执行，新实例将停留在构造函数状态：
+            # 组件未绑定（时钟不再走动）、或停在 "加载中" 提示（每日一言）。
+            p_loader.run_plugins()  # 执行插件入口，激活新构造的实例
 
         self.load_plugin_cards()
         self.update_plugin_count()
