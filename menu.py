@@ -1254,9 +1254,8 @@ class SettingsMenu(FluentWindow):
         self.plInterface.setObjectName("plInterface")
         self.wtInterface = uic.loadUi(str(CW_HOME / 'view/menu/weather.ui'))  # 天气
         self.wtInterface.setObjectName("wtInterface")
-        self.version_number_label = self.ifInterface.findChild(QLabel, 'version_number_label')
+        self.debug_version_label = self.ifInterface.findChild(QLabel, 'debug_version_label')
         self.build_commit_label = self.ifInterface.findChild(QLabel, 'build_commit_label')
-        self.build_uuid_label = self.ifInterface.findChild(QLabel, 'build_uuid_label')
         self.build_date_label = self.ifInterface.findChild(QLabel, 'build_date_label')
 
         # 向后兼容
@@ -3273,34 +3272,8 @@ class SettingsMenu(FluentWindow):
 
         self.version = self.findChild(BodyLabel, 'version')
 
-        check_update_btn = self.findChild(PrimaryPushButton, 'check_update')
-        check_update_btn.setIcon(fIcon.SYNC)
-        check_update_btn.clicked.connect(self.check_update)
-
-        self.auto_check_update = self.ifInterface.findChild(SwitchButton, 'auto_check_update')
-        self.auto_check_update.setChecked(
-            int(config_center.read_conf("Version", "auto_check_update", "1"))
-        )
-        self.auto_check_update.checkedChanged.connect(
-            lambda checked: switch_checked("Version", "auto_check_update", checked)
-        )  # 自动检查更新
-
-        self.version_channel = self.findChild(ComboBox, 'version_channel')
-        self.version_channel.addItems(list_.version_channel)
-        self.version_channel.setCurrentIndex(
-            int(
-                '1'
-                if (channel := config_center.read_conf("Version", "version_channel"))
-                not in ['0', '1']
-                else channel
-            )
-        )
-        self.version_channel.currentIndexChanged.connect(
-            lambda: config_center.write_conf(
-                "Version", "version_channel", self.version_channel.currentIndex()
-            )
-        )  # 版本更新通道
-
+        # 已彻底移除“更新”分区（检查更新按钮 / 自动检查开关 / 更新通道），
+        # 不再请求上游版本接口，仅展示本地版本与构建信息。
         github_page = self.findChild(PushButton, "button_github")
         github_page.clicked.connect(
             lambda: QDesktopServices.openUrl(
@@ -3308,15 +3281,11 @@ class SettingsMenu(FluentWindow):
             )
         )
 
-        bilibili_page = self.findChild(PushButton, 'button_bilibili')
-        bilibili_page.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl(self.tr('https://space.bilibili.com/569522843')))
-        )
-
-        weblate_page = self.findChild(PushButton, 'button_weblate')
-        weblate_page.clicked.connect(
+        # 指向本 Fork 的仓库（原为上游作者的哔哩哔哩主页）
+        fork_github_page = self.findChild(PushButton, 'button_fork_github')
+        fork_github_page.clicked.connect(
             lambda: QDesktopServices.openUrl(
-                QUrl('https://hosted.weblate.org/engage/class-widgets-1')
+                QUrl(self.tr('https://github.com/mliucc/mliucc-Class-Widgets'))
             )
         )
 
@@ -4809,42 +4778,37 @@ class SettingsMenu(FluentWindow):
         logger.debug('已停用自动检测更新，跳过上游版本请求')
 
     def _set_build_info_labels(self) -> None:
-        """填充构建信息标签（纯本地配置读取，不联网）。"""
+        """填充构建信息标签（纯本地配置读取，不联网）。
+
+        编译日期取 build_time（构建流程注入为 UTC+8 的 YYYY-MM-DD HH:MM），
+        Build Commit 取 build_commit（7 位短 SHA）。未注入时显示 Debug。
+        """
         build_commit = config_center.read_conf("Version", "build_commit")
         build_branch = config_center.read_conf("Version", "build_branch")
-        build_runid = config_center.read_conf("Version", "build_runid")
-        build_type = config_center.read_conf("Version", "build_type")
         build_time = config_center.read_conf("Version", "build_time")
 
         self.build_commit_label.setText(
-            f'{build_commit if build_commit != "__BUILD_COMMIT__" else "Debug"}({build_branch if build_branch != "__BUILD_BRANCH__" else "Debug"})'
-        )
-        self.build_uuid_label.setText(
-            f'{build_runid if build_runid != "__BUILD_RUNID__" else "Debug"} - {build_type if build_type != "__BUILD_TYPE__" else "Debug"}'
+            f'{build_commit if build_commit != "__BUILD_COMMIT__" else "Debug"}'
+            f'({build_branch if build_branch != "__BUILD_BRANCH__" else "Debug"})'
         )
         self.build_date_label.setText(
             f'{build_time if build_time != "__BUILD_TIME__" else "Debug"}'
         )
 
     def _show_local_version_info(self) -> None:
-        """只展示本地版本与构建信息（已停用上游版本对比）。"""
-        local_version = config_center.read_conf("Version", "version") or "0.0.0"
-        self._set_build_info_labels()
+        """只展示本地版本与构建信息（已停用上游版本对比）。
 
-        if local_version == "__BUILD_VERSION__":
-            # 开发运行时配置里的版本号是占位符，回退为 Debug 文案
-            self.version_number_label.setText(self.tr('版本号：Debug\n调试版本！'))
-        else:
-            self.version_number_label.setText(
-                self.tr('版本号：{local_version}').format(local_version=local_version)
-            )
-        logger.debug(f"本地版本信息: {local_version}")
+        “调试版本！”在 .ui 中即为初始文案，此处用 tr() 重新设置一次，
+        以保证该字符串可被 lupdate 提取并随语言切换更新。
+        """
+        self._set_build_info_labels()
+        if self.debug_version_label is not None:
+            self.debug_version_label.setText(self.tr('调试版本！'))
 
     def check_version(self, version):  # 检查更新
         """已停用：上游版本对比逻辑不再参与显示，仅保留本地信息。"""
         self._show_local_version_info()
         return None
-
 
     def cf_import_schedule_cses(self, file_path: str):  # 导入课程表（CSES）
         # TODO: 切换到 pathlib.Path
