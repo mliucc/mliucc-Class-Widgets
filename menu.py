@@ -118,7 +118,7 @@ from generate_speech import (
     get_tts_service,
     get_voice_name_by_id_sync,
 )
-from network_thread import VersionThread, getCity, scheduleThread
+from network_thread import getCity, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
 
@@ -3334,7 +3334,8 @@ class SettingsMenu(FluentWindow):
             )
         )
 
-        self.check_update()
+        # 已停用自动检测更新：不再请求上游版本接口，只展示本地构建信息
+        self._show_local_version_info()
 
     def setup_advance_interface(self):
         adv_scroll = self.adInterface.findChild(SmoothScrollArea, 'adv_scroll')  # 触摸屏适配
@@ -4801,28 +4802,14 @@ class SettingsMenu(FluentWindow):
         return None
 
     def check_update(self):
-        self.version_thread = VersionThread()
-        self.version_thread.version_signal.connect(self.check_version)
-        self.version_thread.start()
+        """已停用：不再请求上游版本接口。
 
-    def check_version(self, version):  # 检查更新
-        if 'error' in version:
-            self.version_number_label.setText(self.tr('版本号：获取失败！'))
+        保留此方法仅为兼容历史调用点，实际不再发起任何网络请求。
+        """
+        logger.debug('已停用自动检测更新，跳过上游版本请求')
 
-            if utils.tray_icon:
-                utils.tray_icon.push_error_notification(
-                    self.tr("检查更新失败！"),
-                    self.tr("检查更新失败！\n{data}").format(data=version['error']),
-                )
-            return False
-
-        channel = int(
-            '1'
-            if (channel := config_center.read_conf("Version", "version_channel")) not in ['0', '1']
-            else channel
-        )
-        new_version = version['version_release' if channel == 0 else 'version_beta']
-        local_version = config_center.read_conf("Version", "version") or "0.0.0"
+    def _set_build_info_labels(self) -> None:
+        """填充构建信息标签（纯本地配置读取，不联网）。"""
         build_commit = config_center.read_conf("Version", "build_commit")
         build_branch = config_center.read_conf("Version", "build_branch")
         build_runid = config_center.read_conf("Version", "build_runid")
@@ -4838,30 +4825,26 @@ class SettingsMenu(FluentWindow):
         self.build_date_label.setText(
             f'{build_time if build_time != "__BUILD_TIME__" else "Debug"}'
         )
-        if local_version != "__BUILD_VERSION__":
-            logger.debug(f"服务端版本: {new_version}，本地版本: {local_version}")
-            if Version(new_version.replace('-nightly', '')) <= Version(
-                local_version.replace('-nightly', '')
-            ):
-                self.version_number_label.setText(
-                    self.tr('版本号：{local_version}\n已是最新版本！').format(
-                        local_version=local_version
-                    )
-                )
-            else:
-                self.version_number_label.setText(
-                    self.tr('版本号：{local_version}\n可更新版本: {new_version}').format(
-                        local_version=local_version, new_version=new_version
-                    )
-                )
-        else:
-            self.version_number_label.setText(self.tr('版本号：Debug\n调试版本！'))
 
-            if utils.tray_icon:
-                utils.tray_icon.push_update_notification(
-                    self.tr("新版本速递：{new_version}").format(new_version=new_version)
-                )
+    def _show_local_version_info(self) -> None:
+        """只展示本地版本与构建信息（已停用上游版本对比）。"""
+        local_version = config_center.read_conf("Version", "version") or "0.0.0"
+        self._set_build_info_labels()
+
+        if local_version == "__BUILD_VERSION__":
+            # 开发运行时配置里的版本号是占位符，回退为 Debug 文案
+            self.version_number_label.setText(self.tr('版本号：Debug\n调试版本！'))
+        else:
+            self.version_number_label.setText(
+                self.tr('版本号：{local_version}').format(local_version=local_version)
+            )
+        logger.debug(f"本地版本信息: {local_version}")
+
+    def check_version(self, version):  # 检查更新
+        """已停用：上游版本对比逻辑不再参与显示，仅保留本地信息。"""
+        self._show_local_version_info()
         return None
+
 
     def cf_import_schedule_cses(self, file_path: str):  # 导入课程表（CSES）
         # TODO: 切换到 pathlib.Path

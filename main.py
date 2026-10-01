@@ -95,7 +95,7 @@ from file import config_center, schedule_center
 from generate_speech import generate_speech_sync
 from i18n_manager import app, global_i18n_manager
 from menu import open_plaza
-from network_thread import check_update, getCity
+from network_thread import getCity
 from custom_notification import custom_notification_manager
 from plugin import p_loader
 from tip_toast import active_windows
@@ -4053,12 +4053,11 @@ if __name__ == '__main__':
             0, lambda: setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         )
 
-    splash_window.update_status((100, QCoreApplication.translate('main', '检查更新...')))
+    splash_window.update_status((100, QCoreApplication.translate('main', '完成')))
 
+    # 已停用自动检测更新：不再请求上游版本接口
     # w = ErrorDialog()
     # w.exec()
-    # if config_center.read_conf('Version', 'auto_check_update', '1') == '1':
-    #     check_update()
 
     splash_window.close()
 
