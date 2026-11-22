@@ -35,6 +35,38 @@ class AudioManager:
         self.mixer_failed = False
         self.cache_lock = Lock()
         self.mixer_lock = Lock()
+        # 静音时段判定回调：由业务层（custom_notification）注入，
+        # 返回 True 表示此刻应跳过播放。None 表示不做静音控制。
+        self._mute_checker = None
+        # 静音判定失败日志的限流时间戳（避免故障时刷屏）
+        self._last_mute_error_log = 0.0
+
+    def set_mute_checker(self, checker) -> None:
+        """注册静音判定回调。
+
+        Args:
+            checker: 无参可调用对象，返回 True 表示当前应静音；传 None 取消。
+        """
+        self._mute_checker = checker
+
+    def _is_silenced(self) -> bool:
+        """当前是否处于静音时段。
+
+        判定失败时按「静音」处理：漏掉一条通知的代价，远小于上课中途
+        突然响铃打扰。为避免故障导致长期无声却无人察觉，失败日志做了
+        限流（每 60 秒最多一条 warning）。
+        """
+        checker = self._mute_checker
+        if checker is None:
+            return False
+        try:
+            return bool(checker())
+        except Exception as e:
+            now = time.time()
+            if now - self._last_mute_error_log >= 60:
+                self._last_mute_error_log = now
+                logger.warning(f"静音时段判定失败，按静音处理以避免打扰: {e}")
+            return True
 
     def _ensure_mixer_initialized(self) -> bool:
         """初始化pygame mixer"""
@@ -122,7 +154,11 @@ class AudioManager:
             return 0.7
 
     def play_audio(
-        self, file_path: str, volume: Optional[float] = None, blocking: bool = True
+        self,
+        file_path: str,
+        volume: Optional[float] = None,
+        blocking: bool = True,
+        force: bool = False,
     ) -> bool:
         """播放音频文件
 
@@ -130,10 +166,16 @@ class AudioManager:
             file_path: 音频文件路径
             volume: 音量 (0.0-1.0)，None时使用配置文件设置
             blocking: 是否阻塞等待播放完成
+            force: 忽略静音时段限制强制播放（如设置页试听）
 
         Returns:
-            bool: 播放是否成功启动
+            bool: 播放是否成功启动（静音跳过时返回 True，视作成功但无声）
         """
+        if not force and self._is_silenced():
+            # 静音时段直接跳过播放：既不出声，也不占用混音通道。
+            # 返回 True 是为了让调用方按"成功"处理，避免触发重试或错误提示。
+            logger.debug(f"静音时段，跳过播放: {os.path.basename(file_path)}")
+            return True
         if not self._ensure_mixer_initialized():
             return False
         is_valid, relative_path = self._validate_audio_file(file_path)
@@ -198,16 +240,20 @@ class PlayAudio(QThread):
         volume: Optional[float] = None,
         cleanup_callback=None,
         blocking: bool = True,
+        force: bool = False,
     ):
         super().__init__()
         self.file_path = file_path
         self.volume = volume
         self.cleanup_callback = cleanup_callback
         self.blocking = blocking
+        self.force = force
 
     def run(self) -> None:
         """线程播放音频"""
-        success = audio_manager.play_audio(self.file_path, self.volume, self.blocking)
+        success = audio_manager.play_audio(
+            self.file_path, self.volume, self.blocking, force=self.force
+        )
         if self.cleanup_callback:
             try:
                 self.cleanup_callback(self.file_path, success)
@@ -234,10 +280,13 @@ def _tts_cleanup_callback(file_path: str, success: bool) -> None:
 
 
 def play_audio(
-    file_path: str, tts_delete_after: bool = False, volume: Optional[float] = None
+    file_path: str,
+    tts_delete_after: bool = False,
+    volume: Optional[float] = None,
+    force: bool = False,
 ) -> bool:
     """播放音频文件"""
-    success = audio_manager.play_audio(file_path, volume, blocking=True)
+    success = audio_manager.play_audio(file_path, volume, blocking=True, force=force)
     if tts_delete_after and success:
         _tts_cleanup_callback(file_path, success)
 
@@ -245,7 +294,10 @@ def play_audio(
 
 
 def play_audio_async(
-    file_path: str, volume: Optional[float] = None, cleanup_callback=None
+    file_path: str,
+    volume: Optional[float] = None,
+    cleanup_callback=None,
+    force: bool = False,
 ) -> PlayAudio:
     """异步播放音频文件
 
@@ -253,11 +305,12 @@ def play_audio_async(
         file_path: 音频文件路径
         volume: 音量 (0.0-1.0)
         cleanup_callback: 播放完成后的清理回调函数
+        force: 忽略静音时段限制强制播放（如设置页试听）
 
     Returns:
         PlayAudio: 音频播放线程对象
     """
-    thread = PlayAudio(file_path, volume, cleanup_callback, blocking=False)
+    thread = PlayAudio(file_path, volume, cleanup_callback, blocking=False, force=force)
     thread.start()
     return thread
 

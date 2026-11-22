@@ -2315,21 +2315,21 @@ class SettingsMenu(FluentWindow):
                     fIcon.EDUCATION,
                     self.tr('上课提醒'),
                     triggered=lambda: tip_toast.push_notification(
-                        1, lesson_name=self.tr('信息技术')
+                        1, lesson_name=self.tr('信息技术'), bypass_quiet=True
                     ),
                 ),
                 Action(
                     fIcon.CAFE,
                     self.tr('下课提醒'),
                     triggered=lambda: tip_toast.push_notification(
-                        0, lesson_name=self.tr('信息技术')
+                        0, lesson_name=self.tr('信息技术'), bypass_quiet=True
                     ),
                 ),
                 Action(
                     fIcon.BOOK_SHELF,
                     self.tr('预备提醒'),
                     triggered=lambda: tip_toast.push_notification(
-                        3, lesson_name=self.tr('信息技术')
+                        3, lesson_name=self.tr('信息技术'), bypass_quiet=True
                     ),
                 ),
                 Action(
@@ -2340,10 +2340,11 @@ class SettingsMenu(FluentWindow):
                         title=self.tr('通知'),
                         subtitle=self.tr('测试通知示例'),
                         content=self.tr('这是一条测试通知ヾ(≧▽≦*)o'),
+                        bypass_quiet=True,
                     ),
                 ),
             ]
-        )
+        )  # 预览通知栏：绕过静音时段限制，保证试听能听到铃声
         preview_toast_button.setMenu(pre_toast_menu)  # 预览通知栏
 
         switch_wave_effect = self.findChild(SwitchButton, 'switch_enable_wave')

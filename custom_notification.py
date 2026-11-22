@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from dataclasses import asdict, dataclass, field, fields
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
@@ -34,6 +35,20 @@ class SubjectAudioOverride:
     states: Optional[List[int]] = None
 
 
+@dataclass
+class QuietPeriod:
+    """静音时段。
+
+    start/end 为 "HH:MM"，精度到分钟；days 为空表示每天生效。
+    暂不支持跨天时段（start > end 会被视为非法配置）。
+    """
+
+    start: str = ""
+    end: str = ""
+    days: List[int] = field(default_factory=list)
+    name: str = ""
+
+
 class CustomNotificationManager:
     def __init__(self) -> None:
         self._file_path = CONFIG_HOME / "custom_notifications.json"
@@ -41,6 +56,9 @@ class CustomNotificationManager:
         self._subject_overrides: List[SubjectAudioOverride] = []
         self._sent_today: Dict[str, str] = {}
         self._last_mtime: float = 0
+        # 静音时段
+        self._quiet_enabled: bool = False
+        self._quiet_periods: List[QuietPeriod] = []
         # 保留配置文件中的其它字段，避免保存时把用户手写的键冲掉
         self._raw_data: Dict[str, Any] = {}
         self._load()
@@ -48,6 +66,8 @@ class CustomNotificationManager:
     def _load(self) -> None:
         if not self._file_path.exists():
             self._notifications = []
+            self._quiet_enabled = False
+            self._quiet_periods = []
             self._raw_data = {}
             self._save()
             logger.info("已创建空的 custom_notifications.json")
@@ -57,6 +77,8 @@ class CustomNotificationManager:
             with open(self._file_path, encoding="utf-8") as f:
                 data = json.load(f)
             self._raw_data = data if isinstance(data, dict) else {}
+            # 旧版配置没有 quiet_hours 键：加载完成后补写一次，把文件升级到新格式
+            format_upgrade = "quiet_hours" not in self._raw_data
 
             raw = data.get("notifications", [])
             self._notifications = []
@@ -94,18 +116,82 @@ class CustomNotificationManager:
                 s["subject"] = s.get("subject", "").strip()
                 self._subject_overrides.append(SubjectAudioOverride(**s))
 
+            self._load_quiet_hours(data.get("quiet_hours", {}))
+
             logger.info(
                 f"已加载 {len(self._notifications)} 条自定义通知, "
-                f"{len(self._subject_overrides)} 条科目音频覆盖"
+                f"{len(self._subject_overrides)} 条科目音频覆盖, "
+                f"{len(self._quiet_periods)} 段静音时段"
+                f"（{'已启用' if self._quiet_enabled else '未启用'}）"
             )
 
             if time_migrated:
                 logger.info(f"检测到 {time_migrated} 条通知时间需要迁移到分钟精度，正在写回配置")
+            if format_upgrade:
+                logger.info("配置缺少 quiet_hours 段落，正在升级配置格式")
+            if time_migrated or format_upgrade:
                 self._save()
         except Exception as e:
             logger.error(f"加载自定义通知失败: {e}")
             self._notifications = []
             self._subject_overrides = []
+            self._quiet_enabled = False
+            self._quiet_periods = []
+
+    def _load_quiet_hours(self, raw: Any) -> None:
+        """解析静音时段配置；解析失败时降级为不静音，不影响通知功能。"""
+        self._quiet_enabled = False
+        self._quiet_periods = []
+        try:
+            if not isinstance(raw, dict):
+                return
+            self._quiet_enabled = bool(raw.get("enabled", False))
+            raw_periods = raw.get("periods", [])
+            if not isinstance(raw_periods, list):
+                logger.warning("quiet_hours.periods 不是数组，已忽略")
+                return
+
+            periods: List[QuietPeriod] = []
+            for item in raw_periods:
+                if not isinstance(item, dict):
+                    continue
+                start = str(item.get("start", "")).strip()
+                end = str(item.get("end", "")).strip()
+                start_sec = self._parse_hhmm(start)
+                end_sec = self._parse_hhmm(end)
+                if start_sec is None or end_sec is None:
+                    logger.warning(f"静音时段格式无效（需 HH:MM），已跳过: {item!r}")
+                    continue
+                if start_sec >= end_sec:
+                    logger.warning(
+                        f"静音时段 {start}~{end} 不是有效区间（暂不支持跨天），已跳过"
+                    )
+                    continue
+
+                days: List[int] = []
+                raw_days = item.get("days", [])
+                if isinstance(raw_days, list):
+                    for d in raw_days:
+                        try:
+                            day_index = int(d)
+                        except (TypeError, ValueError):
+                            continue
+                        if 0 <= day_index <= 6:
+                            days.append(day_index)
+
+                periods.append(
+                    QuietPeriod(
+                        start=start,
+                        end=end,
+                        days=days,
+                        name=str(item.get("name", "")).strip(),
+                    )
+                )
+            self._quiet_periods = periods
+        except Exception as e:
+            logger.error(f"解析静音时段配置失败，本次不启用静音: {e}")
+            self._quiet_enabled = False
+            self._quiet_periods = []
 
     @staticmethod
     def _normalize_minute_time(value: Any) -> Tuple[str, bool]:
@@ -136,6 +222,23 @@ class CustomNotificationManager:
         normalized = f"{hour:02d}:{minute:02d}"
         return normalized, normalized != text
 
+    @staticmethod
+    def _parse_hhmm(value: str) -> Optional[int]:
+        """把 "HH:MM" 解析为当天秒数；精度限制在分钟，忽略可能的秒部分。"""
+        if not value:
+            return None
+        parts = str(value).strip().split(":")
+        if len(parts) < 2:
+            return None
+        try:
+            hour = int(parts[0])
+            minute = int(parts[1])
+        except (TypeError, ValueError):
+            return None
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            return None
+        return hour * 3600 + minute * 60
+
     def _auto_reload(self) -> None:
         try:
             if self._file_path.exists() and os.path.getmtime(self._file_path) != self._last_mtime:
@@ -146,8 +249,12 @@ class CustomNotificationManager:
     def _save(self) -> None:
         try:
             # 以读入的原始配置为基底，保留用户手写的其它字段，
-            # 避免保存时把未知键冲掉。
+            # 避免保存时把 quiet_hours 之外的未知键冲掉。
             data: Dict[str, Any] = dict(getattr(self, "_raw_data", {}) or {})
+            data["quiet_hours"] = {
+                "enabled": self._quiet_enabled,
+                "periods": [asdict(p) for p in self._quiet_periods],
+            }
             data["subject_audio_overrides"] = [asdict(s) for s in self._subject_overrides]
             data["notifications"] = [asdict(n) for n in self._notifications]
             with open(self._file_path, "w", encoding="utf-8") as f:
@@ -160,6 +267,44 @@ class CustomNotificationManager:
                 pass
         except Exception as e:
             logger.error(f"保存自定义通知失败: {e}")
+
+    def is_quiet_now(self, now: Optional[datetime] = None) -> bool:
+        """当前是否处于静音时段。
+
+        时间基准为软件内时间（含 NTP 校正与时差偏移），
+        与铃声/课程判定口径保持一致，不直接使用 datetime.now()。
+
+        时段起点提前 1 秒生效：例如设定 12:40 且时差偏移为 0 时，
+        软件时间 12:39:59 即开始静音；时差偏移 5 秒时则对应真实时间 12:40:04。
+        精度限制在分钟（秒一律视为 0）。
+
+        Args:
+            now: 可选的判定时间，便于测试；缺省取软件内当前时间。
+
+        Returns:
+            bool: True 表示当前应静音。
+        """
+        if not self._quiet_enabled or not self._quiet_periods:
+            return False
+
+        if now is None:
+            now = TimeManagerFactory.get_instance().get_current_time()
+
+        weekday = now.weekday()
+        current_sec = now.hour * 3600 + now.minute * 60 + now.second
+
+        for period in self._quiet_periods:
+            if period.days and weekday not in period.days:
+                continue
+            start = self._parse_hhmm(period.start)
+            end = self._parse_hhmm(period.end)
+            if start is None or end is None or start >= end:
+                continue
+            # 起点提前 1 秒；00:00 起点无需也无法再提前
+            start_adj = start - 1 if start > 0 else 0
+            if start_adj <= current_sec < end:
+                return True
+        return False
 
     def get_all(self) -> List[CustomNotification]:
         return self._notifications
@@ -201,6 +346,7 @@ class CustomNotificationManager:
         now = TimeManagerFactory.get_instance().get_current_time()
         today_date = now.strftime("%Y-%m-%d")
         weekday = now.weekday()
+        # 时间精度到分钟：同一分钟内仅触发一次（由 _sent_today 去重保证）
         time_str = now.strftime("%H:%M")
 
         self._clean_sent_cache(today_date)
@@ -267,3 +413,12 @@ class CustomNotificationManager:
 
 
 custom_notification_manager = CustomNotificationManager()
+
+# 向音频层注册静音判定回调：所有音频播放（铃声 / TTS / 插件）都会先询问一次。
+# 放在实例创建之后注册，避免与 play_audio 产生循环导入。
+try:
+    from play_audio import audio_manager as _audio_manager
+
+    _audio_manager.set_mute_checker(custom_notification_manager.is_quiet_now)
+except Exception as e:  # pragma: no cover - 仅在异常环境中触发
+    logger.warning(f"注册静音时段判定失败，静音功能将不可用: {e}")
